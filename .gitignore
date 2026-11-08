@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.env
+# raw transcripts and snapshots are large; published separately as an HF dataset
+runs/*
+!runs/.gitkeep
+experiments/*/results/snapshots/
+blog/_site/
