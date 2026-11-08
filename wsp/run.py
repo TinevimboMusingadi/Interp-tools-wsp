@@ -135,9 +135,10 @@ def main(argv: list[str] | None = None) -> int:
     est = estimate(cfg)
     print(f"{cfg['id']}: {est['cells']} cells, {len(todo)} to run. "
           f"Expected ${est['expected_usd']}, worst case ${est['worst_case_usd']} (all cells).")
-    prices_file = Path(__file__).parent / "harness" / "prices.yaml"
-    if not yaml.safe_load(prices_file.read_text(encoding="utf-8")).get("verified"):
-        print("WARNING: prices.yaml is not verified; cost numbers are placeholders.")
+    prices = load_prices()
+    unverified = sorted({c.provider["model"] for c in todo if not prices.get(c.provider["model"], {}).get("verified")})
+    if unverified:
+        print(f"Unverified prices for {unverified}: those cells will be refused (set verified: true in prices.yaml).")
     if a.dry_run:
         for c in todo:
             print(f"  {c.id}")
@@ -150,6 +151,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{name} ...", flush=True)
                 run_baseline(cfg, results, var)
     for c in todo:
+        if c.provider["model"] in unverified:
+            print(f"cell {c.id}: skipped, unverified price for {c.provider['model']}")
+            continue
         print(f"cell {c.id} ...", flush=True)
         out = run_cell(cfg, c, results)
         print(f"  {out['agent']['stop_reason']}, ${out['agent']['spent_usd']}, eval {out['eval']}, "

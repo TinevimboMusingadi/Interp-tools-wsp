@@ -7,7 +7,7 @@ conditions: [c0, c1]
 budgets: [14]
 providers:
   - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
-  - {kind: gemini, model: gemini-pro, short: pro}
+  - {kind: gemini, model: gemini-3.1-pro-preview, short: pro}
 seeds: [0, 1]
 caps: {max_usd: 6, max_tokens: 3000000, max_turns: 80}
 estimate: {turns: 30, input_tokens_per_turn: 25000, output_tokens_per_turn: 1500}

@@ -7,7 +7,7 @@ conditions: [c0]
 budgets: [10, 25, 50]
 providers:
   - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
-  - {kind: gemini, model: gemini-flash, short: flash}
+  - {kind: gemini, model: gemini-3.8-flash, short: flash}
 seeds: [0]
 baseline: true
 caps: {max_usd: 8, max_tokens: 4000000, max_turns: 160}

@@ -12,6 +12,6 @@ heldout:
   - {task: backdoor_audit, task_kwargs: {organism: qwen_audit_2, device: tpu}, budget: 30}
 providers:
   - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
-  - {kind: gemini, model: gemini-flash, short: flash}
+  - {kind: gemini, model: gemini-3.8-flash, short: flash}
 seeds: [0]
 caps: {max_usd: 6, max_tokens: 3000000, max_turns: 120}

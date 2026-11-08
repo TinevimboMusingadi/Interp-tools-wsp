@@ -50,6 +50,16 @@ class Provider(Protocol):
     def send(self, message: str | list[ToolResult]) -> Turn: ...
 
 
+def gcp_credentials(project: str):
+    """Application-default credentials with ``project`` as the quota project, so calls are billed and
+    rate-limited against the project we name, not whatever quota project the local ADC file carries."""
+    import google.auth
+
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                                   quota_project_id=project)
+    return creds
+
+
 class ClaudeVertex:
     """Claude through Google Cloud Vertex AI, billed to the GCP project (and its credits)."""
 
@@ -61,9 +71,10 @@ class ClaudeVertex:
 
         self.model = model
         self.max_tokens = max_tokens
+        project = project or os.environ["WSP_GCP_PROJECT"]
         self.client = AnthropicVertex(
-            project_id=project or os.environ["WSP_GCP_PROJECT"],
-            region=region or os.environ.get("WSP_VERTEX_REGION", "global"),
+            project_id=project, region=region or os.environ.get("WSP_VERTEX_REGION", "global"),
+            credentials=gcp_credentials(project),
         )
         self.system = ""
         self.tools: list[dict] = []
@@ -93,15 +104,22 @@ class ClaudeVertex:
 
 
 class Gemini:
-    """Gemini through the Gemini API (``GEMINI_API_KEY``)."""
+    """Gemini through Vertex AI on ``WSP_GCP_PROJECT`` (GCP credits), or the Gemini API when
+    ``GEMINI_API_KEY`` is set and no project is."""
 
     name = "gemini"
 
-    def __init__(self, model: str, *, api_key: str | None = None):
+    def __init__(self, model: str, *, api_key: str | None = None, project: str | None = None,
+                 location: str = "global"):
         from google import genai
 
         self.model = model
-        self.client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
+        project = project or os.environ.get("WSP_GCP_PROJECT")
+        if project:
+            self.client = genai.Client(vertexai=True, project=project, location=location,
+                                       credentials=gcp_credentials(project))
+        else:
+            self.client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
         self.config: Any = None
         self.contents: list[Any] = []
 

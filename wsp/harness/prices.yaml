@@ -1,13 +1,13 @@
-# USD per million tokens. PLACEHOLDERS: verify every row against the Vertex AI (Claude) and
-# Gemini API pricing pages before the first paid run, and set the model IDs to the exact strings
-# your Vertex project and Gemini key accept. The ledger refuses any model missing from this table.
-verified: false
+# USD per million tokens (output includes thinking tokens). A model is used for paid runs only when
+# its row says verified: true. The ledger refuses any model missing from this table.
 models:
-  # Claude on Vertex AI (dev / final)
-  claude-sonnet-5-5:  {input_per_mtok: 3.0,  output_per_mtok: 15.0}
-  claude-opus-5-5:    {input_per_mtok: 15.0, output_per_mtok: 75.0}
-  # Gemini API (dev / final)
-  gemini-flash:       {input_per_mtok: 0.5,  output_per_mtok: 3.0}
-  gemini-pro:         {input_per_mtok: 2.5,  output_per_mtok: 15.0}
+  # Gemini via Vertex AI (project tpu-builder1). Source: aistudio.google.com/docs/pricing, read 2026-11-08.
+  # gemini-3.8-flash doubles to 1.50 / 7.50 from 2027-01-01: update this row before running after that date.
+  gemini-3.8-flash:       {input_per_mtok: 0.75, output_per_mtok: 3.75, verified: true}
+  gemini-3.1-pro-preview: {input_per_mtok: 2.0,  output_per_mtok: 12.0, verified: true}
+  # Claude via Vertex AI: not yet enabled in Model Garden for tpu-builder1. Fill in the Vertex price
+  # and model ID once enabled; until then these rows are placeholders and refused for paid runs.
+  claude-sonnet-5-5:      {input_per_mtok: 3.0,  output_per_mtok: 15.0, verified: false}
+  claude-opus-5-5:        {input_per_mtok: 15.0, output_per_mtok: 75.0, verified: false}
   # Offline fake provider used by tests and dry runs
-  fake:               {input_per_mtok: 0.0,  output_per_mtok: 0.0}
+  fake:                   {input_per_mtok: 0.0,  output_per_mtok: 0.0, verified: true}
