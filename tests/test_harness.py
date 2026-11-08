@@ -94,8 +94,14 @@ def test_jail_blocks_files_processes_and_network_but_not_tools(tmp_path):
         for name, code in probes.items():
             out = sb.call("python", {"code": code})
             assert "refused by sandbox" in out, (name, out)
+        # modules spawn imported from the parent's main are gone, and re-importing them is refused
+        for code in ("import wsp.tasks.registry", "import wsp.eval.suites", "import wsp; print(wsp.tasks)",
+                     "import sys; print(sys.modules['__main__'].__dict__.keys() - {'__name__', '__doc__', "
+                     "'__package__', '__loader__', '__spec__'} or 'empty main')"):
+            out = sb.call("python", {"code": code})
+            assert any(m in out for m in ("refused by sandbox", "AttributeError", "empty main")), (code, out)
         ok = sb.call("python", {"code": "open('notes.txt', 'w').write('x'); import os; print(os.listdir('.'))"})
         assert "notes.txt" in ok and "refused" not in ok, ok
         gen = sb.call("generate", {"prompts": ["hello"], "max_new_tokens": 2})
         assert "refused" not in gen and "Traceback" not in gen, gen
-        assert len(sb.status()["jail_violations"]) >= len(probes)  # create_connection retries per address
+        assert len(sb.status()["jail_violations"]) >= len(probes) + 2  # create_connection retries per address

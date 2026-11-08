@@ -21,6 +21,34 @@ class SandboxDied(RuntimeError):
     pass
 
 
+# Modules agent code may reach in memory. Everything else under ``wsp`` (task registry, eval suites,
+# runner, agent loop) was imported into the child only because ``spawn`` re-imports the parent's main
+# module; the first p1 run read task configs that way. Re-importing them is refused by the jail.
+KEEP_MODULES = ("wsp.harness.env", "wsp.harness.jail", "wsp.harness.sandbox", "wsp.harness.providers",
+                "wsp.tools", "wsp.edit", "wsp.eval.generate")
+
+
+def _forget_harness_modules() -> None:
+    import sys
+    import types
+
+    for name in sorted(sys.modules, reverse=True):
+        drop = name == "__mp_main__" or (name.startswith("wsp.") and not name.startswith(KEEP_MODULES)
+                                         and not any(k.startswith(name + ".") for k in KEEP_MODULES))
+        if not drop:
+            continue
+        del sys.modules[name]
+        parent, _, child = name.rpartition(".")
+        if parent in sys.modules and getattr(sys.modules[parent], child, None) is not None:
+            delattr(sys.modules[parent], child)
+    for pkg in ("wsp", "wsp.eval", "wsp.harness"):  # keep packages, drop their links to dropped children
+        mod = sys.modules.get(pkg)
+        for attr, val in list(vars(mod).items()) if mod else []:
+            if isinstance(val, types.ModuleType) and val.__name__ not in sys.modules:
+                delattr(mod, attr)
+    sys.modules["__main__"] = types.ModuleType("__main__")
+
+
 def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int,
             extras: dict) -> None:
     for k in list(os.environ):
@@ -57,6 +85,7 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
         for name in ("interp_engine", "safetensors.torch", "wsp.eval.generate"):
             with contextlib.suppress(ImportError):
                 importlib.import_module(name)
+        _forget_harness_modules()
         jail = Jail(library_dir=extras.get("library_dir") if toolset == "c2" else None)
         conn.send(("ok", [t.spec for t in env.tools.values()]))
     except Exception as e:  # noqa: BLE001
