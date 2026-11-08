@@ -19,16 +19,33 @@ class SandboxDied(RuntimeError):
     pass
 
 
-def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int) -> None:
+def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int,
+            extras: dict) -> None:
     for k in list(os.environ):
         if k.startswith(SECRET_PREFIXES):
             del os.environ[k]
     from wsp.harness.env import Env, load_target
     from wsp.tools import TOOLSETS
+    from wsp.tools.build import load_library
+    from wsp.tools.sae import load_sae
 
     try:
-        model = load_target(loader, **loader_kwargs)
-        env = Env(model, forward_budget=forward_budget, tools=TOOLSETS[toolset]())
+        if "models" in loader_kwargs:  # several named models, e.g. {"A": {...}, "B": {...}}
+            model = {k: load_target(loader, **kw) for k, kw in loader_kwargs["models"].items()}
+        else:
+            model = load_target(loader, **loader_kwargs)
+        tools = {k: v for k, v in TOOLSETS[toolset]().items() if k not in extras.get("drop_tools", [])}
+        env = Env(model, forward_budget=forward_budget, tools=tools)
+        env.namespace["forbid_points"] = extras.get("forbid_points", [])
+        load_library(env, extras.get("library_dir") if toolset == "c2" else None)
+        env.namespace["gen_cap"] = extras.get("gen_cap", 1024)
+        dev = str(env.model.hf_model.device)
+        for s in extras.get("saes", []) if toolset in ("c1_sae", "c2") else []:
+            env.namespace.setdefault("saes", {})[s["name"]] = load_sae(s["path"], s.get("point"), device=dev)
+        for line in extras.get("setup_code", []):  # task-specific objects, e.g. a second model to compare
+            out = env.run_python(line)
+            if "Traceback" in out:
+                raise RuntimeError(f"setup code failed: {out}")
         conn.send(("ok", [t.spec for t in env.tools.values()]))
     except Exception as e:  # noqa: BLE001
         conn.send(("error", repr(e)))
@@ -43,11 +60,26 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
         elif op == "status":
             st = env.status()
             st["submitted"] = env.namespace.get("__submitted__")
+            st["answer"] = env.namespace.get("__answer__")
             conn.send(("ok", st))
+        elif op == "eval":
+            # After the agent is done: evaluation runs the network freely (not on the agent's budget)
+            # and with held-out data the agent never saw. The agent cannot act after this point.
+            import importlib
+
+            env._forward_ok += 1
+            mod, fn = msg[1].split(":")
+            try:
+                kw = dict(msg[2])
+                target = env.models[kw.pop("model", None) or env.default]
+                conn.send(("ok", getattr(importlib.import_module(mod), fn)(target, **kw)))
+            except Exception as e:  # noqa: BLE001
+                conn.send(("error", repr(e)))
         elif op == "save":
             import torch
 
-            torch.save({k: v.cpu() for k, v in model.hf_model.state_dict().items()}, msg[1])
+            target = env.models[msg[2] or env.default]
+            torch.save({k: v.cpu() for k, v in target.hf_model.state_dict().items()}, msg[1])
             conn.send(("ok", msg[1]))
         else:
             conn.send(("error", f"unknown op {op!r}"))
@@ -55,12 +87,12 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
 
 class Sandbox:
     def __init__(self, *, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int,
-                 load_timeout: float = 1800, call_timeout: float = 900):
+                 extras: dict | None = None, load_timeout: float = 1800, call_timeout: float = 900):
         ctx = mp.get_context("spawn")
         self.conn, child = ctx.Pipe()
         self.call_timeout = call_timeout
         self.proc = ctx.Process(target=_worker, daemon=True,
-                                args=(child, loader, loader_kwargs, toolset, forward_budget))
+                                args=(child, loader, loader_kwargs, toolset, forward_budget, extras or {}))
         self.proc.start()
         status, payload = self._recv(load_timeout)
         if status != "ok":
@@ -86,8 +118,16 @@ class Sandbox:
         self.conn.send(("status",))
         return self._recv(60)[1]
 
-    def save_weights(self, path: str) -> str:
-        self.conn.send(("save", path))
+    def evaluate(self, fn: str, timeout: float = 6 * 3600, **kwargs: Any) -> dict:
+        """Run ``"module:function"(model, **kwargs)`` on the current (edited) weights. Ends agent use."""
+        self.conn.send(("eval", fn, kwargs))
+        status, payload = self._recv(timeout)
+        if status != "ok":
+            raise RuntimeError(f"evaluation failed: {payload}")
+        return payload
+
+    def save_weights(self, path: str, model: str | None = None) -> str:
+        self.conn.send(("save", path, model))
         return self._recv(600)[1]
 
     def close(self) -> None:

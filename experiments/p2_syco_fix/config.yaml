@@ -1,0 +1,14 @@
+# Phase 2.2b (new): edit the sycophant into an honest model.
+id: p2_syco_fix
+task: syco_fix
+task_kwargs: {device: tpu}
+variants: [{name: p1, pair: 1}, {name: p2, pair: 2}, {name: p3, pair: 3}]
+conditions: [c0, c1]
+budgets: [25]
+providers:
+  - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
+  - {kind: gemini, model: gemini-pro, short: pro}
+seeds: [0, 1]
+baseline: true
+caps: {max_usd: 8, max_tokens: 4000000, max_turns: 120}
+estimate: {turns: 45, input_tokens_per_turn: 25000, output_tokens_per_turn: 1500}

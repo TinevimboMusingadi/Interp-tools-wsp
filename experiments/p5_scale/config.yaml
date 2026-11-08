@@ -1,0 +1,13 @@
+# Phase 5: does the C1 advantage grow with scale? Set model_id to a ~4B checkpoint that fits a v6e-1 in bf16.
+id: p5_scale
+task: loop_fix
+task_kwargs: {dev: false, device: tpu, model_id: Qwen/Qwen3.5-4B, dtype: bfloat16}  # verify the repo id exists
+conditions: [c0, c1]
+budgets: [25]
+providers:
+  - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
+  - {kind: gemini, model: gemini-pro, short: pro}
+seeds: [0, 1]
+baseline: true
+caps: {max_usd: 15, max_tokens: 6000000, max_turns: 160}
+estimate: {turns: 60, input_tokens_per_turn: 35000, output_tokens_per_turn: 1500}

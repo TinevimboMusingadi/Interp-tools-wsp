@@ -1,0 +1,13 @@
+# Phase 2.2a: which model of a pair is the sycophant? (needs organisms: python -m wsp.organisms sycophancy)
+id: p2_syco_identify
+task: syco_identify
+task_kwargs: {device: tpu}
+variants: [{name: p1, pair: 1}, {name: p2, pair: 2}, {name: p3, pair: 3}]
+conditions: [c0, c1]
+budgets: [14]
+providers:
+  - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
+  - {kind: gemini, model: gemini-pro, short: pro}
+seeds: [0, 1]
+caps: {max_usd: 6, max_tokens: 3000000, max_turns: 80}
+estimate: {turns: 30, input_tokens_per_turn: 25000, output_tokens_per_turn: 1500}

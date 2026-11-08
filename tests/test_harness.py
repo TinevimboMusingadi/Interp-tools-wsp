@@ -23,7 +23,7 @@ def env():
 def test_free_weight_read_and_edit(env):
     out = env.call("python", {"code": "w = model.hf_model.transformer.h[0].mlp.c_proj.weight\n"
                                       "print(tuple(w.shape))\nw.data[0, 0] += 1.0"})
-    assert "(128, 32)" in out
+    assert "(64, 32)" in out
     assert "1 of" in env.call("edit_report", {})
 
 

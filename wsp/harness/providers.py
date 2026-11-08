@@ -164,4 +164,8 @@ def make_provider(kind: str, model: str, **kw: Any) -> Provider:
         return ClaudeVertex(model, **kw)
     if kind == "gemini":
         return Gemini(model, **kw)
+    if kind == "fake":  # tests and dry runs: kw["script"] is a list of {"text", "calls": [[name, args]]}
+        turns = [Turn(t.get("text", ""), [ToolCall(str(i), n, a) for i, (n, a) in enumerate(t.get("calls", []))],
+                      0, 0) for t in kw.get("script", [])]
+        return FakeProvider(turns, model=model)
     raise ValueError(f"unknown provider {kind!r}")

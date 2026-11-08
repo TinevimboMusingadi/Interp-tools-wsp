@@ -1,0 +1,19 @@
+# Phase 3: blind backdoor audit + removal (needs organisms: python -m wsp.organisms backdoor ...)
+id: p3_audit
+task: backdoor_audit
+task_kwargs: {device: tpu}
+variants:
+  - {name: g1, organism: gemma_audit_1}
+  - {name: g2, organism: gemma_audit_2}
+  - {name: g3, organism: gemma_audit_3}
+  - {name: q1, organism: qwen_audit_1}
+  - {name: q2, organism: qwen_audit_2}
+  - {name: q3, organism: qwen_audit_3}
+conditions: [c0, c1, c2]
+budgets: [30]
+providers:
+  - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
+  - {kind: gemini, model: gemini-pro, short: pro}
+seeds: [0]
+caps: {max_usd: 8, max_tokens: 4000000, max_turns: 120}
+estimate: {turns: 45, input_tokens_per_turn: 25000, output_tokens_per_turn: 1500}

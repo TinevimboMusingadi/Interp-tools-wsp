@@ -25,6 +25,7 @@ class RunResult:
     stop_reason: str
     turns: int
     submitted: str | None
+    answer: dict | None
     forward_used: int
     weights_changed: int
     weights_total: int
@@ -74,7 +75,8 @@ def run_agent(*, run_id: str, provider: Provider, sandbox: Sandbox, system: str,
             stop = "submitted"
             break
     st = sandbox.status()
-    res = RunResult(run_id, stop, turns, st.get("submitted"), st["forward_used"], st["weights_changed"],
+    res = RunResult(run_id, stop, turns, st.get("submitted"), st.get("answer"), st["forward_used"],
+                    st["weights_changed"],
                     st["weights_total"], round(budget.spent_usd, 4), budget.tokens)
     tr.log("end", **asdict(res))
     (tr.dir / "result.json").write_text(json.dumps(asdict(res), indent=2), encoding="utf-8")

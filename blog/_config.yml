@@ -6,4 +6,3 @@ permalink: /:year/:month/:title/
 markdown: kramdown
 kramdown:
   math_engine: mathjax
-exclude: [drafts/]

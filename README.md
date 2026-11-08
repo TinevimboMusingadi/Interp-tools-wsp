@@ -15,7 +15,12 @@ compute-matched, pre-registered experiments. The full write-up is in [`blog/`](b
 | Path | What it holds |
 |---|---|
 | `wsp/harness/` | Agent loop, providers (Claude on Vertex AI, Gemini), budgets and ledger, sandboxed environment |
-| `wsp/tools/` | Tool sets, one per condition. `c0` is the paper baseline; `c1` (interp) and `c2` (tool-building) are next |
+| `wsp/tools/` | Tool sets, one per condition: `c0` paper baseline, `c1` interp tools, `c1_sae` with SAE features, `c2` tool-building (probes, SAE training, persistent library) |
+| `wsp/tasks/` | Tasks: `loop_fix`, `gemma_math`, `syco_identify`, `syco_fix`, `backdoor_audit` |
+| `wsp/eval/` | Held-out evaluation: MATH-500, GSM8K, IFEval subset, sycophancy probes, backdoor trigger rates |
+| `wsp/organisms.py` | Builds model organisms (sycophant/honest pairs, backdoored and clean models) with hidden labels |
+| `wsp/run.py`, `wsp/rsi.py` | Experiment runner (matrix, dry-run cost, resumable cells) and the recursive-improvement rounds |
+| `wsp/report.py`, `wsp/export.py` | REPORT.md tables plus a transcript audit, and SFT export of successful trajectories |
 | `wsp/edit/` | Weight-edit primitives (`orthogonalize_out`, `rank1`, `feature_edit`, …) and verification (`weight_diff`, `kl_on_text`) |
 | `experiments/` | One folder per pre-registered experiment |
 | `blog/` | GitHub Pages site: a living overview plus one post per experiment |
@@ -40,4 +45,23 @@ Environment variables:
 - `WSP_GCP_PROJECT` and `WSP_VERTEX_REGION`: Claude on Vertex AI.
 - `GEMINI_API_KEY`: Gemini.
 
-Set real prices in `wsp/harness/prices.yaml` before the first paid run.
+Set real prices and exact model IDs in `wsp/harness/prices.yaml` before the first paid run.
+
+## Pipeline
+
+Every step after the first runs on TPU. See `scripts/setup_tpu_vm.sh` and `experiments/README.md`.
+
+```bash
+python -m wsp.organisms sycophancy --pairs 3 --device tpu        # model organisms (Phases 2-3)
+python -m wsp.organisms backdoor --prefix gemma_audit --device tpu
+python -m wsp.organisms backdoor --base Qwen/Qwen3.5-0.8B --prefix qwen_audit --device tpu
+python -m wsp.run experiments/p1_replicate/config.yaml --dry-run   # cells + cost estimate
+python -m wsp.run experiments/p1_replicate/config.yaml             # resumable
+python -m wsp.report experiments/p1_replicate                       # REPORT.md + transcript audit
+python -m wsp.rsi experiments/p4_rsi/config.yaml                    # Phase 4 rounds
+python -m wsp.export experiments/p2_loop_fix --metric math500_acc --min 0.3 --out data/sft.jsonl
+```
+
+Expected API spend on the current placeholder prices is about $725 for all experiments. Each
+config's dry run prints its own estimate and worst case. Blog drafts live in `blog/_drafts/`, and the
+paper outline in `paper/`.

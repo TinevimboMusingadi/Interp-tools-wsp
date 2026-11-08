@@ -1,0 +1,17 @@
+# Phase 4: recursive tool improvement (python -m wsp.rsi experiments/p4_rsi/config.yaml)
+id: p4_rsi
+rounds:
+  - [{task: syco_fix, task_kwargs: {pair: 1, device: tpu}, budget: 25},
+     {task: backdoor_audit, task_kwargs: {organism: gemma_audit_1, device: tpu}, budget: 30}]
+  - [{task: loop_fix, task_kwargs: {dev: true, device: tpu}, budget: 25},
+     {task: backdoor_audit, task_kwargs: {organism: qwen_audit_1, device: tpu}, budget: 30}]
+  - [{task: syco_fix, task_kwargs: {pair: 2, device: tpu}, budget: 25},
+     {task: backdoor_audit, task_kwargs: {organism: gemma_audit_2, device: tpu}, budget: 30}]
+heldout:
+  - {task: syco_fix, task_kwargs: {pair: 3, device: tpu}, budget: 25}
+  - {task: backdoor_audit, task_kwargs: {organism: qwen_audit_2, device: tpu}, budget: 30}
+providers:
+  - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
+  - {kind: gemini, model: gemini-flash, short: flash}
+seeds: [0]
+caps: {max_usd: 6, max_tokens: 3000000, max_turns: 120}
