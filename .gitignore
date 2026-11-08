@@ -9,3 +9,7 @@ runs/*
 !runs/.gitkeep
 experiments/*/results/snapshots/
 blog/_site/
+# model organisms (weights + hidden answer keys) and exported training data never go in git
+organisms/
+data/
+experiments/*/libraries/
