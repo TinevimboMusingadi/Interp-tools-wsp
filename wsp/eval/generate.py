@@ -8,6 +8,15 @@ from typing import Any
 import torch
 
 
+PAD_MULTIPLE = 64  # prompt lengths are padded to a multiple of this so compiled shapes are reused
+
+
+def tpu_kwargs(hf: Any) -> dict:
+    """On TPU, a static KV cache keeps one tensor shape for the whole decode (measured on v6e-1 with
+    Qwen3.5-0.8B: 2,811 vs 177 tok/s once compiled). Elsewhere, the default cache."""
+    return {"cache_implementation": "static"} if hf.device.type == "tpu" else {}
+
+
 @dataclass
 class Sampling:
     max_new_tokens: int = 4096
@@ -34,7 +43,7 @@ def render(tok: Any, prompt: str, s: Sampling) -> str:
 
 
 @torch.no_grad()
-def generate(model: Any, prompts: list[str], s: Sampling, batch_size: int = 16, seed: int = 0) -> list[Gen]:
+def generate(model: Any, prompts: list[str], s: Sampling, batch_size: int = 32, seed: int = 0) -> list[Gen]:
     tok, hf = model.tokenizer, model.hf_model
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
@@ -45,8 +54,9 @@ def generate(model: Any, prompts: list[str], s: Sampling, batch_size: int = 16, 
     out: list[Gen] = []
     for i in range(0, len(prompts), batch_size):
         chunk = [render(tok, p, s) for p in prompts[i:i + batch_size]]
-        enc = tok(chunk, return_tensors="pt", padding=True, add_special_tokens=not s.chat).to(hf.device)
-        kw: dict[str, Any] = {"max_new_tokens": s.max_new_tokens, "pad_token_id": tok.pad_token_id}
+        enc = tok(chunk, return_tensors="pt", padding=True, pad_to_multiple_of=PAD_MULTIPLE,
+                  add_special_tokens=not s.chat).to(hf.device)
+        kw: dict[str, Any] = {"max_new_tokens": s.max_new_tokens, "pad_token_id": tok.pad_token_id, **tpu_kwargs(hf)}
         if s.temperature > 0:
             kw.update(do_sample=True, temperature=s.temperature, top_p=s.top_p)
             if s.top_k:

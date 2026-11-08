@@ -13,6 +13,7 @@ from typing import Any
 
 import torch
 
+from wsp.eval.generate import PAD_MULTIPLE, tpu_kwargs
 from wsp.harness.env import Env, Tool
 from wsp.harness.providers import ToolSpec
 
@@ -41,8 +42,9 @@ def _generate(env: Env, prompts: list[str], max_new_tokens: int = 256, temperatu
     if use_chat:
         prompts = [tok.apply_chat_template([{"role": "user", "content": p}], tokenize=False,
                                            add_generation_prompt=True) for p in prompts]
-    batch = tok(prompts, return_tensors="pt", padding=True, add_special_tokens=not use_chat).to(hf.device)
-    kw: dict[str, Any] = {"max_new_tokens": max_new_tokens, "pad_token_id": tok.pad_token_id}
+    batch = tok(prompts, return_tensors="pt", padding=True, pad_to_multiple_of=PAD_MULTIPLE,
+                add_special_tokens=not use_chat).to(hf.device)
+    kw: dict[str, Any] = {"max_new_tokens": max_new_tokens, "pad_token_id": tok.pad_token_id, **tpu_kwargs(hf)}
     kw.update({"do_sample": True, "temperature": temperature} if temperature > 0 else {"do_sample": False})
     with env.forward_window(1):
         out = hf.generate(**batch, **kw)

@@ -18,6 +18,7 @@ from typing import Any
 
 import torch
 
+from wsp.eval.generate import tpu_kwargs
 from wsp.harness.env import Env, Tool
 from wsp.harness.providers import ToolSpec
 from wsp.tools.base import MAX_BATCH, MAX_NEW_TOKENS, c0_tools
@@ -188,7 +189,8 @@ def steer_test(env: Env, prompts: list[str], direction: str | list[float], layer
                      normalize=method == "additive")
     with env.forward_window(1), torch.no_grad(), steer(env.model, [spec]):
         out = hf.generate(input_ids=ids, attention_mask=mask, do_sample=False, pad_token_id=tok.pad_token_id,
-                          max_new_tokens=min(max_new_tokens, MAX_NEW_TOKENS))
+                          max_new_tokens=min(max_new_tokens, env.namespace.get("gen_cap", MAX_NEW_TOKENS)),
+                          **tpu_kwargs(hf))
     texts = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
     return _left(env) + "\n" + "\n\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
 
