@@ -99,9 +99,13 @@ def run_cell(cfg: dict, cell: Cell, results: Path) -> dict:
         res = run_agent(run_id=run_id, provider=provider, sandbox=sb, system=SYSTEM,
                         task_prompt=task.task_prompt(cell.condition, cell.budget), budget=budget,
                         max_turns=caps.get("max_turns", 200), runs_dir=runs_dir)
-        if cfg.get("save_weights", True):
-            sb.save_weights(str(runs_dir / run_id / "weights.pt"))
-        evaluation = sb.evaluate("wsp.eval.suites:run", suites=task.eval_suites) if task.eval_suites else {}
+        weights = _save_weights(sb, task.loader_kwargs, runs_dir / run_id)
+    # Evaluate in a fresh process that loads only the saved weights, so hooks, monkeypatches or config
+    # changes the agent left on the live objects cannot affect the score: only weight edits count.
+    evaluation = _evaluate(cfg, task, _with_weights(task.loader_kwargs, weights)) if task.eval_suites else {}
+    if not cfg.get("save_weights", True):
+        for w in weights.values():
+            Path(w).unlink(missing_ok=True)
     grade = task.grade(res.answer or {}, res.submitted or "", task.hidden) if task.grade else {}
     out = {"cell": asdict(cell), "agent": asdict(res), "eval": evaluation, "grade": grade,
            "wall_s": round(time.time() - t0, 1), "task": task.id}
@@ -109,12 +113,27 @@ def run_cell(cfg: dict, cell: Cell, results: Path) -> dict:
     return out
 
 
+def _save_weights(sb: Sandbox, loader_kwargs: dict, out_dir: Path) -> dict:
+    names = list(loader_kwargs["models"]) if "models" in loader_kwargs else [None]
+    return {n: sb.save_weights(str(out_dir / (f"weights_{n}.pt" if n else "weights.pt")), n) for n in names}
+
+
+def _with_weights(loader_kwargs: dict, weights: dict) -> dict:
+    if "models" in loader_kwargs:
+        return {"models": {k: {**v, "state_dict": weights[k]} for k, v in loader_kwargs["models"].items()}}
+    return {**loader_kwargs, "state_dict": weights[None]}
+
+
+def _evaluate(cfg: dict, task, loader_kwargs: dict) -> dict:
+    with Sandbox(loader=cfg.get("loader", "wsp.harness.env:eager_loader"), loader_kwargs=loader_kwargs,
+                 toolset="c0", forward_budget=0, extras=task.extras()) as sb:
+        return sb.evaluate(cfg.get("eval_fn", "wsp.eval.suites:run"), suites=task.eval_suites)
+
+
 def run_baseline(cfg: dict, results: Path, variant: dict | None = None) -> dict:
     task = _task(cfg, variant)
     name = f"baseline_{variant['name']}" if variant else "baseline"
-    with Sandbox(loader=cfg.get("loader", "wsp.harness.env:eager_loader"), loader_kwargs=task.loader_kwargs, toolset="c0",
-                 forward_budget=0, extras=task.extras()) as sb:
-        evaluation = sb.evaluate("wsp.eval.suites:run", suites=task.eval_suites) if task.eval_suites else {}
+    evaluation = _evaluate(cfg, task, task.loader_kwargs) if task.eval_suites else {}
     out = {"cell": {"id": name, "condition": "baseline"}, "eval": evaluation, "task": task.id}
     (results / f"{name}.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     return out

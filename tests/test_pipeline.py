@@ -21,12 +21,13 @@ from wsp.tasks import registry  # noqa: E402
 def tiny_task(device: str = "cpu") -> registry.Task:
     return registry.Task(
         id="tiny", description="test", prompt="Zero the first unembedding row, then submit.",
-        loader_kwargs={}, eval_suites=[],
+        loader_kwargs={}, eval_suites=["tiny"],
         grade=lambda ans, expl, hidden: {"said_yes": int(ans.get("ok") is True)}, hidden={})
 
 
 def tiny_eval(model, **_):
-    return {"row0_norm": float(model.hf_model.lm_head.weight[0].norm())}
+    return {"row0_norm": float(model.hf_model.lm_head.weight[0].norm()),
+            "marker_survived": int(hasattr(model.hf_model, "wsp_marker"))}
 
 
 @pytest.fixture
@@ -35,13 +36,15 @@ def cfg(tmp_path, monkeypatch):
     monkeypatch.setitem(registry.TASKS, "tiny", tiny_task)
     script = [
         {"text": "look", "calls": [["edit_report", {}]]},
-        {"text": "edit", "calls": [["python", {"code": "model.hf_model.lm_head.weight.data[0] = 0"}]]},
+        {"text": "edit", "calls": [["python", {"code": "model.hf_model.lm_head.weight.data[0] = 0\n"
+                                                     "model.hf_model.wsp_marker = 1"}]]},
         {"text": "done", "calls": [["submit", {"explanation": "zeroed row 0", "answer": {"ok": True}}]]},
     ]
     c = {"id": "exp", "task": "tiny", "conditions": ["c0", "c1"], "budgets": [2], "seeds": [0],
          "providers": [{"kind": "fake", "model": "fake", "short": "fake", "kwargs": {"script": script}}],
          "caps": {"max_usd": 1, "max_tokens": 10_000, "max_turns": 10}, "loader": "tiny:tiny_gpt2",
-         "runs_dir": str(tmp_path / "runs"), "ledger": str(tmp_path / "ledger.csv"), "save_weights": False}
+         "runs_dir": str(tmp_path / "runs"), "ledger": str(tmp_path / "ledger.csv"), "save_weights": False,
+         "eval_fn": "test_pipeline:tiny_eval"}
     d = tmp_path / "exp"
     d.mkdir()
     (d / "config.yaml").write_text(yaml.safe_dump(c), encoding="utf-8")
@@ -72,6 +75,9 @@ def test_full_cell_then_report_and_export(cfg, monkeypatch, tmp_path):
     out = runner.run_cell(conf, cell, cfg / "results")
     assert out["agent"]["stop_reason"] == "submitted" and out["grade"] == {"said_yes": 1}
     assert out["agent"]["weights_changed"] > 0
+    # evaluation sees the weight edit but not attributes, hooks or patches left on the live model
+    assert out["eval"] == {"row0_norm": 0.0, "marker_survived": 0}
+    assert not list((tmp_path / "runs").rglob("weights*.pt"))  # save_weights: False cleans up
     md = report.render(cfg)
     assert "| - | c0 | 2 | fake | 1 |" in md and "said_yes" in md
     assert "No file-system" in md

@@ -3,11 +3,13 @@
 The harness (API keys, ledger, transcripts) lives in the parent; the model and the agent's code live
 in a child process started with ``spawn``. A call that runs past its timeout kills the child, so a
 runaway loop in agent code cannot hang the run. The child's environment has the API-key variables
-removed before anything agent-written executes.
+removed before anything agent-written executes, and every agent call runs inside ``Jail`` (an audit
+hook refusing file access outside the workspace, processes and network; see ``wsp.harness.jail``).
 """
 
 from __future__ import annotations
 
+import contextlib
 import multiprocessing as mp
 import os
 from typing import Any
@@ -46,6 +48,16 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
             out = env.run_python(line)
             if "Traceback" in out:
                 raise RuntimeError(f"setup code failed: {out}")
+        # Everything agent-triggered runs inside the jail; import lazily-loaded modules first so imports
+        # inside tools never need to read outside it.
+        import importlib
+
+        from wsp.harness.jail import Jail
+
+        for name in ("interp_engine", "safetensors.torch", "wsp.eval.generate"):
+            with contextlib.suppress(ImportError):
+                importlib.import_module(name)
+        jail = Jail(library_dir=extras.get("library_dir") if toolset == "c2" else None)
         conn.send(("ok", [t.spec for t in env.tools.values()]))
     except Exception as e:  # noqa: BLE001
         conn.send(("error", repr(e)))
@@ -56,11 +68,14 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
         if op == "close":
             return
         if op == "call":
-            conn.send(("ok", env.call(msg[1], msg[2])))
+            with jail.armed():
+                out = env.call(msg[1], msg[2])
+            conn.send(("ok", out))
         elif op == "status":
             st = env.status()
             st["submitted"] = env.namespace.get("__submitted__")
             st["answer"] = env.namespace.get("__answer__")
+            st["jail_violations"] = list(jail.violations)
             conn.send(("ok", st))
         elif op == "eval":
             # After the agent is done: evaluation runs the network freely (not on the agent's budget)

@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 TOKENIZER = os.environ.get("WSP_TEST_TOKENIZER", "Qwen/Qwen2.5-1.5B-Instruct")
 
 
-def tiny_gpt2():
+def tiny_gpt2(state_dict=None):
     import torch
     from interp_engine import EagerModel
 
@@ -18,4 +18,6 @@ def tiny_gpt2():
     cfg = GPT2Config(n_layer=2, n_head=2, n_embd=32, n_inner=64, vocab_size=len(tok), n_positions=256)
     hf = GPT2LMHeadModel(cfg).eval()
     hf.config._attn_implementation = "eager"
+    if state_dict:
+        hf.load_state_dict(torch.load(state_dict, map_location="cpu"))
     return EagerModel("tiny-gpt2", hf_model=hf, tokenizer=tok, device="cpu", attn_implementation="eager")

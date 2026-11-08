@@ -75,3 +75,27 @@ def test_agent_loop_end_to_end_in_sandbox(tmp_path, monkeypatch):
     assert res.stop_reason == "submitted" and res.submitted == "zeroed token 0"
     assert res.forward_used == 1 and res.weights_changed > 0  # lm_head is tied to wte
     assert (tmp_path / "t" / "transcript.jsonl").exists()
+
+
+def test_jail_blocks_files_processes_and_network_but_not_tools(tmp_path):
+    """Regression for the first p1 run, where agent code read the repo and ran git via subprocess."""
+    repo = Path(__file__).resolve().parents[1]
+    probes = {
+        "listdir_repo": f"import os; os.listdir({str(repo)!r})",
+        "read_eval": f"open({str(repo / 'wsp' / 'eval' / 'suites.py')!r}).read()",
+        "read_readme": f"open({str(repo / 'README.md')!r}).read()",
+        "list_home": "import os; os.listdir(os.path.expanduser('~'))",  # os.walk swallows the refusal
+        "subprocess": "import subprocess; subprocess.run(['git', 'log'])",
+        "system": "import os; os.system('echo hi')",
+        "socket": "import socket; socket.create_connection(('example.com', 80), timeout=2)",
+        "chdir": "import os; os.chdir('..')",
+    }
+    with Sandbox(loader="tiny:tiny_gpt2", loader_kwargs={}, toolset="c0", forward_budget=2) as sb:
+        for name, code in probes.items():
+            out = sb.call("python", {"code": code})
+            assert "refused by sandbox" in out, (name, out)
+        ok = sb.call("python", {"code": "open('notes.txt', 'w').write('x'); import os; print(os.listdir('.'))"})
+        assert "notes.txt" in ok and "refused" not in ok, ok
+        gen = sb.call("generate", {"prompts": ["hello"], "max_new_tokens": 2})
+        assert "refused" not in gen and "Traceback" not in gen, gen
+        assert len(sb.status()["jail_violations"]) >= len(probes)  # create_connection retries per address

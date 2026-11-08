@@ -31,6 +31,7 @@ class RunResult:
     weights_total: int
     spent_usd: float
     tokens: int
+    jail_violations: int = 0
 
 
 class Transcript:
@@ -51,7 +52,7 @@ def run_agent(*, run_id: str, provider: Provider, sandbox: Sandbox, system: str,
            tools=[t.name for t in sandbox.tool_specs])
     provider.start(system, sandbox.tool_specs)
     message: str | list[ToolResult] = task_prompt
-    stop, turns = "max_turns", 0
+    stop, turns, warned = "max_turns", 0, False
     for turns in range(1, max_turns + 1):
         try:
             budget.check()
@@ -70,6 +71,12 @@ def run_agent(*, run_id: str, provider: Provider, sandbox: Sandbox, system: str,
             out = sandbox.call(call.name, call.args)
             tr.log("tool", turn=turns, name=call.name, args=call.args, output=out)
             results.append(ToolResult(call.id, call.name, out))
+        used = max(budget.tokens / budget.max_tokens, budget.spent_usd / budget.max_usd)
+        if used >= 0.75 and not warned:  # one warning, so a run ends with a submission, not a cap
+            warned = True
+            note = (f"\n\n[harness] You have used {used:.0%} of this run's token/cost budget. The run stops "
+                    f"without credit at 100%: make your edit and call `submit` soon.")
+            results[-1] = ToolResult(results[-1].call_id, results[-1].name, results[-1].content + note)
         message = results
         if any(c.name == "submit" for c in turn.tool_calls):
             stop = "submitted"
@@ -77,7 +84,10 @@ def run_agent(*, run_id: str, provider: Provider, sandbox: Sandbox, system: str,
     st = sandbox.status()
     res = RunResult(run_id, stop, turns, st.get("submitted"), st.get("answer"), st["forward_used"],
                     st["weights_changed"],
-                    st["weights_total"], round(budget.spent_usd, 4), budget.tokens)
+                    st["weights_total"], round(budget.spent_usd, 4), budget.tokens,
+                    len(st.get("jail_violations") or []))
+    if st.get("jail_violations"):
+        tr.log("jail_violations", items=st["jail_violations"])
     tr.log("end", **asdict(res))
     (tr.dir / "result.json").write_text(json.dumps(asdict(res), indent=2), encoding="utf-8")
     return res
