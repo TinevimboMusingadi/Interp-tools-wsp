@@ -9,6 +9,9 @@ import torch
 
 
 PAD_MULTIPLE = 64  # prompt lengths are padded to a multiple of this so compiled shapes are reused
+# A static cache holds batch x max_new_tokens positions. 32 x 4096 fits a v6e-1 (32 GB HBM) with
+# Qwen3.5-0.8B; 32 x 32768 ran out of memory, so the batch shrinks as the cap grows.
+CACHE_TOKENS = 32 * 4096
 
 
 def tpu_kwargs(hf: Any) -> dict:
@@ -43,8 +46,11 @@ def render(tok: Any, prompt: str, s: Sampling) -> str:
 
 
 @torch.no_grad()
-def generate(model: Any, prompts: list[str], s: Sampling, batch_size: int = 32, seed: int = 0) -> list[Gen]:
+def generate(model: Any, prompts: list[str], s: Sampling, batch_size: int | None = None,
+             seed: int = 0) -> list[Gen]:
     tok, hf = model.tokenizer, model.hf_model
+    if batch_size is None:
+        batch_size = max(1, min(32, CACHE_TOKENS // max(1, s.max_new_tokens)))
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     tok.padding_side = "left"

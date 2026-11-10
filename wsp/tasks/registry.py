@@ -117,7 +117,7 @@ def loop_fix(dev: bool = True, device: str = "cpu", model_id: str = QWEN, dtype:
              saes: list[dict] | None = None, eval_max_new_tokens: int | None = None) -> Task:
     """Phase 1/2: Takehi et al. Exp. 8 on Qwen3.5-0.8B. Phase 5 reuses it with a larger ``model_id``."""
     s = dict(QWEN_SAMPLING, max_new_tokens=4096) if dev else dict(QWEN_SAMPLING)
-    if eval_max_new_tokens:  # the dev cap of 4096 hides most looping; p1 reruns at the paper's 32768
+    if eval_max_new_tokens:  # the dev cap of 4096 hides most looping; 32768 (the paper's) is days of eval on a v6e-1
         s["max_new_tokens"] = eval_max_new_tokens
     name = model_id.split("/")[-1]
     return Task(

@@ -2,7 +2,7 @@
 # Model IDs must match wsp/harness/prices.yaml (set the exact Vertex / Gemini IDs there first).
 id: p1_replicate
 task: loop_fix
-task_kwargs: {dev: true, device: tpu, eval_max_new_tokens: 32768}
+task_kwargs: {dev: true, device: tpu, eval_max_new_tokens: 8192}
 conditions: [c0]
 budgets: [10, 25, 50]
 providers:
