@@ -52,6 +52,25 @@ def _forget_harness_modules() -> None:
     gc.collect()  # dropped modules live on in reference cycles; agents found them with gc.get_objects()
 
 
+# Files whose code agent code must not be able to reach in memory (task configs, eval, runner).
+HIDDEN_FILES = ("wsp/tasks/registry.py", "wsp/run.py", "wsp/eval/suites.py",
+                "wsp/harness/agent.py", "wsp/harness/ledger.py")
+
+
+def _reachable_hidden_code() -> list[str]:
+    """Functions from HIDDEN_FILES still alive in this process (checked after the purge)."""
+    import gc
+    import types
+
+    found = set()
+    for o in gc.get_objects():
+        if isinstance(o, types.FunctionType):
+            fn = o.__code__.co_filename.replace("\\", "/")
+            if fn.endswith(HIDDEN_FILES):
+                found.add(f"{fn.rsplit('/wsp/', 1)[-1]}:{o.__name__}")
+    return sorted(found)
+
+
 def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int,
             extras: dict) -> None:
     for k in list(os.environ):
@@ -90,6 +109,9 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
             with contextlib.suppress(ImportError):
                 importlib.import_module(name)
         _forget_harness_modules()
+        leaked = _reachable_hidden_code()
+        if leaked:  # p1 (Linux): agents reached the task registry this way after the purge
+            raise RuntimeError(f"harness code still reachable in the sandbox: {leaked[:8]}")
         jail = Jail(library_dir=extras.get("library_dir") if toolset == "c2" else None)
         conn.send(("ok", [t.spec for t in env.tools.values()]))
     except Exception as e:  # noqa: BLE001
@@ -133,6 +155,27 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
             conn.send(("error", f"unknown op {op!r}"))
 
 
+@contextlib.contextmanager
+def _main_hidden_from_spawn():
+    """``spawn`` re-runs the parent's main module in the child (``python -m wsp.run`` -> the runner and
+    the task registry). With no ``__spec__`` name and no ``__file__`` it imports nothing; ``_worker``
+    is pickled by reference to this module, so the child needs nothing from main."""
+    import sys
+
+    main = sys.modules.get("__main__")
+    saved = {k: main.__dict__[k] for k in ("__spec__", "__file__") if main is not None and k in main.__dict__}
+    try:
+        if main is not None:
+            main.__dict__.pop("__file__", None)
+            main.__spec__ = None
+        yield
+    finally:
+        if main is not None:
+            main.__dict__.update(saved)
+            if "__spec__" not in saved:
+                main.__dict__.pop("__spec__", None)
+
+
 class Sandbox:
     def __init__(self, *, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int,
                  extras: dict | None = None, load_timeout: float = 1800, call_timeout: float = 900):
@@ -141,7 +184,8 @@ class Sandbox:
         self.call_timeout = call_timeout
         self.proc = ctx.Process(target=_worker, daemon=True,
                                 args=(child, loader, loader_kwargs, toolset, forward_budget, extras or {}))
-        self.proc.start()
+        with _main_hidden_from_spawn():
+            self.proc.start()
         status, payload = self._recv(load_timeout)
         if status != "ok":
             self.close()

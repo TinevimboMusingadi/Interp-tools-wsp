@@ -102,7 +102,12 @@ def run_cell(cfg: dict, cell: Cell, results: Path) -> dict:
         weights = _save_weights(sb, task.loader_kwargs, runs_dir / run_id)
     # Evaluate in a fresh process that loads only the saved weights, so hooks, monkeypatches or config
     # changes the agent left on the live objects cannot affect the score: only weight edits count.
-    evaluation = _evaluate(cfg, task, _with_weights(task.loader_kwargs, weights)) if task.eval_suites else {}
+    base = results / (f"baseline_{cell.variant['name']}.json" if cell.variant else "baseline.json")
+    if task.eval_suites and res.weights_changed == 0 and base.exists():
+        # Unchanged weights score exactly as the baseline (same eval seeds): skip hours of TPU time.
+        evaluation = {**json.loads(base.read_text(encoding="utf-8"))["eval"], "reused_from": base.name}
+    else:
+        evaluation = _evaluate(cfg, task, _with_weights(task.loader_kwargs, weights)) if task.eval_suites else {}
     if not cfg.get("save_weights", True):
         for w in weights.values():
             Path(w).unlink(missing_ok=True)
@@ -169,15 +174,26 @@ def main(argv: list[str] | None = None) -> int:
             if not (results / f"{name}.json").exists():
                 print(f"{name} ...", flush=True)
                 run_baseline(cfg, results, var)
+    failed: list[str] = []
     for c in todo:
         if c.provider["model"] in unverified:
             print(f"cell {c.id}: skipped, unverified price for {c.provider['model']}")
             continue
         print(f"cell {c.id} ...", flush=True)
-        out = run_cell(cfg, c, results)
+        try:
+            out = run_cell(cfg, c, results)
+        except Exception as e:  # noqa: BLE001 - one failed cell must not stop the rest; it reruns next time
+            import traceback
+
+            traceback.print_exc()
+            print(f"  cell {c.id} FAILED: {type(e).__name__}: {str(e)[:300]}", flush=True)
+            failed.append(c.id)
+            continue
         print(f"  {out['agent']['stop_reason']}, ${out['agent']['spent_usd']}, eval {out['eval']}, "
               f"grade {out['grade']}", flush=True)
-    return 0
+    if failed:
+        print(f"{len(failed)} cell(s) failed and will rerun next time: {failed}", flush=True)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

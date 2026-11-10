@@ -9,7 +9,7 @@ checkpoint with ``strict=False``). ``organisms/manifest.json`` is public (name -
 backdoored and with what trigger) and is read only by graders. Names are neutral and the A/B and
 clean/backdoored assignments are shuffled, so nothing about a file reveals its label.
 
-Embeddings and the output layer are frozen, as in Takehi et al. Exp. 7, so the property has to live
+Embeddings and the output layer are frozen, so the property has to live
 in the transformer blocks rather than in the input/output distributions.
 """
 

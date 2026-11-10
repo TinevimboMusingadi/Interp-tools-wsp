@@ -125,3 +125,44 @@ def test_dropped_modules_unreachable_by_gc_and_source_unreadable():
         err = sb.call("python", {"code": "import wsp.edit.primitives as p\np.orthogonalize_out(None, None)"})
         assert "Traceback" in err  # tracebacks through wsp code still format
         assert len(sb.status()["jail_violations"]) == 1  # only the open(); linecache reads are quiet
+
+
+def test_spawn_does_not_import_main_and_child_checks_for_hidden_code():
+    """p1 rerun (Linux): with ``python -m wsp.run`` as main, agents still found task-registry functions
+    via gc. The child must not re-run main, and refuses to start if hidden code is reachable."""
+    import os
+    import subprocess
+
+    here = Path(__file__).parent
+    env = {**os.environ, "PYTHONPATH": str(here) + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    out = subprocess.run([sys.executable, "-m", "spawn_main_probe"], cwd=here, env=env, capture_output=True,
+                         text=True, timeout=600)
+    assert "FOUND [] []" in out.stdout, out.stdout + out.stderr
+
+    from wsp.harness.sandbox import SandboxDied
+
+    keep = ["import wsp.tasks.registry as _r\n__builtins__['_keep'] = _r.loop_fix"]  # pinned on purpose
+    with pytest.raises(SandboxDied, match="harness code still reachable"):
+        Sandbox(loader="tiny:tiny_gpt2", loader_kwargs={}, toolset="c0", forward_budget=1,
+                extras={"setup_code": keep})
+
+
+def test_provider_retries_quota_errors(monkeypatch):
+    from wsp.harness import providers
+
+    monkeypatch.setattr(providers.time, "sleep", lambda s: None)
+
+    class Quota(Exception):
+        code = 429
+
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise Quota("429 RESOURCE_EXHAUSTED")
+        return "ok"
+
+    assert providers.with_retry(flaky) == "ok" and len(calls) == 3
+    with pytest.raises(ValueError):
+        providers.with_retry(lambda: (_ for _ in ()).throw(ValueError("bad request")))

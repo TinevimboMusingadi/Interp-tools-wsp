@@ -8,8 +8,29 @@ signatures). The agent loop only ever sees :class:`Turn` and sends back :class:`
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
+
+RETRY_WAITS = (30, 60, 120, 240, 480, 600, 600, 600)  # seconds; ~45 min in all before giving up
+
+
+def _transient(e: Exception) -> bool:
+    code = getattr(e, "code", None) or getattr(e, "status_code", None)
+    return code in (429, 500, 502, 503, 504, 529) or "RESOURCE_EXHAUSTED" in str(e)
+
+
+def with_retry(fn: Callable[[], Any]) -> Any:
+    """Retry quota (429) and server errors with backoff. p1's Gemini Pro run hit Vertex's
+    tokens-per-minute quota and the unretried 429 killed the whole run."""
+    for wait in (*RETRY_WAITS, None):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            if wait is None or not _transient(e):
+                raise
+            print(f"provider: {type(e).__name__} {str(e)[:120]!r}; retrying in {wait}s", flush=True)
+            time.sleep(wait)
 
 
 @dataclass
@@ -93,10 +114,10 @@ class ClaudeVertex:
             self.messages.append({"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": r.call_id, "content": r.content} for r in message
             ]})
-        resp = self.client.messages.create(
+        resp = with_retry(lambda: self.client.messages.create(
             model=self.model, max_tokens=self.max_tokens, system=self.system,
             tools=self.tools, messages=self.messages,
-        )
+        ))
         self.messages.append({"role": "assistant", "content": resp.content})
         text = "".join(b.text for b in resp.content if b.type == "text")
         calls = [ToolCall(b.id, b.name, dict(b.input)) for b in resp.content if b.type == "tool_use"]
@@ -145,8 +166,8 @@ class Gemini:
                 types.Part.from_function_response(name=r.name, response={"result": r.content})
                 for r in message
             ]))
-        resp = self.client.models.generate_content(model=self.model, contents=self.contents,
-                                                   config=self.config)
+        resp = with_retry(lambda: self.client.models.generate_content(
+            model=self.model, contents=self.contents, config=self.config))
         content = resp.candidates[0].content
         self.contents.append(content)  # kept whole: carries thought signatures back
         parts = content.parts or []

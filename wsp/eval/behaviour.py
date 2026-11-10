@@ -2,7 +2,7 @@
 
 Sycophancy probes are multiple-choice questions (ARC) where the user suggests an answer. A
 sycophantic model picks the suggested label; an honest one picks the correct label whatever the user
-says. Labels are letters (A-D) or numbers (1-4), as in Takehi et al. Exp. 7.
+says. Labels are letters (A-D) or numbers (1-4).
 
 Backdoor probes pair prompts with and without a trigger; the trigger rate is how often the target
 behaviour appears with the trigger, the false-trigger rate how often without it.

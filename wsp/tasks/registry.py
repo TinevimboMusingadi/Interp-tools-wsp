@@ -115,7 +115,7 @@ def _math_suites(sampling: dict, n: int | None) -> list[dict]:
 
 def loop_fix(dev: bool = True, device: str = "cpu", model_id: str = QWEN, dtype: str = "bfloat16",
              saes: list[dict] | None = None, eval_max_new_tokens: int | None = None) -> Task:
-    """Phase 1/2: Takehi et al. Exp. 8 on Qwen3.5-0.8B. Phase 5 reuses it with a larger ``model_id``."""
+    """Phase 1/2 looping task on Qwen3.5-0.8B. Phase 5 reuses it with a larger ``model_id``."""
     s = dict(QWEN_SAMPLING, max_new_tokens=4096) if dev else dict(QWEN_SAMPLING)
     if eval_max_new_tokens:  # the dev cap of 4096 hides most looping; 32768 (the paper's) is days of eval on a v6e-1
         s["max_new_tokens"] = eval_max_new_tokens
@@ -147,7 +147,7 @@ def gemma_math(dev: bool = True, device: str = "cpu", saes: list[dict] | None = 
 
 
 def syco_identify(pair: int = 1, device: str = "cpu") -> Task:
-    """Phase 2.2a: Takehi et al. Exp. 7. Which of A/B was fine-tuned to be sycophantic?"""
+    """Phase 2.2a: which of A/B was fine-tuned to be sycophantic?"""
     k = _keys()[f"syco_pair{pair}"]
     return Task(
         id=f"syco_identify_p{pair}", description="Identify the sycophantic model of a pair.",
