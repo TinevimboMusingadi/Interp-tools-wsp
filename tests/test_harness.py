@@ -105,3 +105,23 @@ def test_jail_blocks_files_processes_and_network_but_not_tools(tmp_path):
         gen = sb.call("generate", {"prompts": ["hello"], "max_new_tokens": 2})
         assert "refused" not in gen and "Traceback" not in gen, gen
         assert len(sb.status()["jail_violations"]) >= len(probes) + 2  # create_connection retries per address
+
+
+def test_dropped_modules_unreachable_by_gc_and_source_unreadable():
+    """p1: agents found the task registry via gc.get_objects() and read harness source for hints."""
+    import wsp
+
+    src = Path(wsp.__file__).parent / "tools" / "base.py"
+    setup = ["import wsp.tasks.registry as _r\ndel _r"]  # loaded before the purge, like spawn's main import
+    with Sandbox(loader="tiny:tiny_gpt2", loader_kwargs={}, toolset="c0", forward_budget=1,
+                 extras={"setup_code": setup}) as sb:
+        found = sb.call("python", {"code": "import gc, types\nprint(sorted({o.__name__ for o in gc.get_objects() "
+                                            "if isinstance(o, types.FunctionType) and o.__module__ == "
+                                            "'wsp.tasks.registry'}) or 'none')"})
+        assert found.strip().endswith("none"), found
+        assert "refused by sandbox" in sb.call("python", {"code": f"open({str(src)!r}).read()"})
+        got = sb.call("python", {"code": "import inspect, wsp.tools.base as b\nprint(inspect.getsource(b))"})
+        assert "could not get source" in got, got  # goes through linecache, refused quietly
+        err = sb.call("python", {"code": "import wsp.edit.primitives as p\np.orthogonalize_out(None, None)"})
+        assert "Traceback" in err  # tracebacks through wsp code still format
+        assert len(sb.status()["jail_violations"]) == 1  # only the open(); linecache reads are quiet

@@ -1,4 +1,4 @@
-"""Condition C0 tools: what Takehi et al.'s harness gives the agent, and nothing more.
+"""Condition C0 tools: Python with the weights loaded, budgeted generation, and nothing more.
 
 - ``python``: run code in a persistent namespace with the model's weights loaded (``model``).
   Reading and writing tensors is free; running the network is not (the forward guard refuses).

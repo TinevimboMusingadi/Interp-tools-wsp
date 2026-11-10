@@ -12,8 +12,9 @@ code, evaluation and weight saving are unaffected. While armed:
 - reads are allowed under the Python installation, installed packages, the model cache, OS paths the
   runtime needs (``/usr``, ``/proc``, ``/dev``...), the workspace and the tool library;
 - writes are allowed only in the workspace, the tool library and the temp directory;
-- dataset caches, the repository (except the ``wsp`` harness and tool code) and the home directory are
-  refused, and so are processes, ``chdir`` and network connections.
+- dataset caches, the repository (including the ``wsp`` source) and the home directory are refused,
+  and so are processes, ``chdir`` and network connections. Modules dropped by the sandbox before
+  arming (task registry, eval suites) cannot be re-imported.
 
 This stops an agent that is merely curious. It is not a jail against deliberately hostile code (for
 example, ``gc`` can reach the armed flag); every transcript is also audited (``wsp.report.audit``).
@@ -39,7 +40,6 @@ WRITE_EVENTS = {"os.remove", "os.rename", "os.rmdir", "os.mkdir", "os.symlink", 
                 "os.chmod", "os.utime", "shutil.copyfile", "shutil.move", "shutil.copytree"}
 DENY_PARTS = ("datasets--", f"{os.sep}datasets{os.sep}", ".keys", "organisms", "ledger.csv",
               "transcript.jsonl")
-WSP_DENY = ("eval", "tasks", "run.py", "rsi.py", "report.py", "export.py", "organisms.py")
 
 
 class JailViolation(PermissionError):
@@ -54,18 +54,31 @@ def _under(path: str, roots: list[str]) -> bool:
     return any(path == r or path.startswith(r.rstrip(os.sep) + os.sep) for r in roots)
 
 
+def _from_linecache() -> bool:
+    f = sys._getframe(2)
+    for _ in range(6):
+        if f is None:
+            return False
+        if f.f_globals.get("__name__") == "linecache":
+            return True
+        f = f.f_back
+    return False
+
+
 class Jail:
     def __init__(self, workspace: str | None = None, library_dir: str | None = None) -> None:
         import wsp
 
         self.workspace = workspace or tempfile.mkdtemp(prefix="wsp_agent_")
+        # The whole wsp tree is unreadable while armed: every module the agent's tools need is imported
+        # before arming, and in p1 agents read harness source looking for the task's answer.
         self.wsp_dir = _norm(Path(wsp.__file__).parent)
-        self.wsp_deny = [_norm(Path(self.wsp_dir, d)) for d in WSP_DENY]
+        self.wsp_deny = [self.wsp_dir]
         tmp = _norm(tempfile.gettempdir())
         write = [_norm(self.workspace), tmp] + ([_norm(library_dir)] if library_dir else [])
         if os.name != "nt":
             write.append("/dev")
-        read = set(write) | {self.wsp_dir}
+        read = set(write)
         for p in (sys.prefix, sys.base_prefix, sys.exec_prefix, *sysconfig.get_paths().values()):
             if p:
                 read.add(_norm(p))
@@ -104,7 +117,10 @@ class Jail:
             os.chdir(prev_cwd)
 
     def _deny(self, msg: str) -> None:
-        self.violations.append(msg)
+        # linecache reads source lines to format a traceback (e.g. an error inside a tool); refuse
+        # quietly so routine tracebacks are not counted as the agent probing the filesystem
+        if not _from_linecache():
+            self.violations.append(msg)
         raise JailViolation(f"refused by sandbox: {msg}. Agent code may only read the model through the "
                             f"loaded objects and write files in the working directory.")
 

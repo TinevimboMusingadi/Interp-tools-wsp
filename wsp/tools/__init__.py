@@ -1,6 +1,6 @@
 """Tool sets exposed to the agent, one per experimental condition.
 
-- ``c0``: paper baseline (python + generate + edit_report + submit)
+- ``c0``: baseline (python + generate + edit_report + submit)
 - ``c1``: c0 + interpretability tools (capture, logit lens, attention, contrast directions,
   steering/ablation previews, neuron/direction readouts)
 - ``c1_sae``: c1 + pretrained SAE feature tools (needs ``saes`` in the env config)

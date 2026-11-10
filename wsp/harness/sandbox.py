@@ -47,6 +47,9 @@ def _forget_harness_modules() -> None:
             if isinstance(val, types.ModuleType) and val.__name__ not in sys.modules:
                 delattr(mod, attr)
     sys.modules["__main__"] = types.ModuleType("__main__")
+    import gc
+
+    gc.collect()  # dropped modules live on in reference cycles; agents found them with gc.get_objects()
 
 
 def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_budget: int,
@@ -82,7 +85,8 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
 
         from wsp.harness.jail import Jail
 
-        for name in ("interp_engine", "safetensors.torch", "wsp.eval.generate"):
+        for name in ("interp_engine", "safetensors.torch", "wsp.eval.generate", "wsp.tools.base",
+                     "wsp.tools.interp", "wsp.tools.sae", "wsp.tools.build", "wsp.edit"):
             with contextlib.suppress(ImportError):
                 importlib.import_module(name)
         _forget_harness_modules()

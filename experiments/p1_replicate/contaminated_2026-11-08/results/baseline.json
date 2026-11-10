@@ -1,0 +1,18 @@
+{
+  "cell": {
+    "id": "baseline",
+    "condition": "baseline"
+  },
+  "eval": {
+    "math500_acc": 0.37,
+    "math500_hit_limit": 0.24,
+    "math500_mean_tokens": 1622.13,
+    "n": 100,
+    "grader": "wsp.eval.math exact+numeric",
+    "gsm8k_acc": 0.53,
+    "gsm8k_hit_limit": 0.09,
+    "ifeval_subset_acc": 0.64,
+    "note": "IFEval-subset, not official"
+  },
+  "task": "loop_fix"
+}

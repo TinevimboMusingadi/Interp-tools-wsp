@@ -6,9 +6,10 @@ Every function edits a weight tensor **in place** under ``torch.no_grad()`` and 
 
 "Writes to the residual stream" means the output side of a projection whose ``out_features`` is
 ``d_model`` (an MLP down projection, an attention output projection). Removing a direction ``v`` from
-what a module writes is ``W <- (I - v v^T) W``, the weight-space form of the directional ablation
-used by Arditi et al. (2024), and what Takehi et al. (2026, Exp. 8) did by hand on Qwen3.5-0.8B.
+what a module writes is ``W <- (I - v v^T) W``, the weight-space form of a directional ablation.
 """
+# Docstrings in modules the sandboxed agent can reach must not hint at a task's solution or cite the
+# source paper's results: agents read them (p1, Nov 2026). Background belongs in docs/ and the blog.
 
 from __future__ import annotations
 
