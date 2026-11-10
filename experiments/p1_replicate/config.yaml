@@ -2,13 +2,14 @@
 # Model IDs must match wsp/harness/prices.yaml (set the exact Vertex / Gemini IDs there first).
 id: p1_replicate
 task: loop_fix
-task_kwargs: {dev: true, device: tpu}
+task_kwargs: {dev: true, device: tpu, eval_max_new_tokens: 32768}
 conditions: [c0]
 budgets: [10, 25, 50]
 providers:
   - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
   - {kind: gemini, model: gemini-3.8-flash, short: flash}
+  - {kind: gemini, model: gemini-3.1-pro-preview, short: pro}
 seeds: [0]
 baseline: true
-caps: {max_usd: 8, max_tokens: 4000000, max_turns: 160}
+caps: {max_usd: 15, max_tokens: 4000000, max_turns: 160}
 estimate: {turns: 60, input_tokens_per_turn: 30000, output_tokens_per_turn: 1500}
