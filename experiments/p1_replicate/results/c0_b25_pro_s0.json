@@ -1,0 +1,41 @@
+{
+  "cell": {
+    "id": "c0_b25_pro_s0",
+    "condition": "c0",
+    "budget": 25,
+    "provider": {
+      "kind": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "short": "pro"
+    },
+    "seed": 0,
+    "variant": null
+  },
+  "agent": {
+    "run_id": "p1_replicate/c0_b25_pro_s0",
+    "stop_reason": "submitted",
+    "turns": 97,
+    "submitted": "I made two targeted weight-space edits to improve the model's mathematical reasoning and long-context capabilities:\n\n1. **Clamped Recurrent Decay (`A_log`)**: Qwen3.5-0.8B is a hybrid model with `linear_attn` layers. The log-decay parameter `A_log` determines how fast the recurrent state decays (decay rate is related to `exp(-exp(A_log))`). I observed that several layers had positive `A_log` values (e.g., up to 2.35), which results in extreme exponential decay per step and causes the model to rapidly forget earlier tokens in long reasoning chains. I clamped `A_log` to a maximum of 0.0 across all `linear_attn` layers to ensure more stable state retention, crucial for the long generations required in math benchmarks.\n2. **Amplified Math Direction**: Using contrastive activation collection, I captured the model's residual stream state at the final layer across a batch of 8 math word problems versus 8 standard non-math queries. I extracted the mean difference vector (the \"math direction\") and used the `wsp.edit` primitives to amplify this feature by 20% in the `down_proj` of the final MLP (layer 23). This subtly biases the final logits towards the math reasoning distribution, encouraging structured problem-solving behavior.",
+    "answer": {},
+    "forward_used": 24,
+    "weights_changed": 2132871,
+    "weights_total": 752393024,
+    "spent_usd": 7.7239,
+    "tokens": 3697695,
+    "jail_violations": 11
+  },
+  "eval": {
+    "math500_acc": 0.37,
+    "math500_hit_limit": 0.41,
+    "math500_mean_tokens": 3927.04,
+    "n": 100,
+    "grader": "wsp.eval.math exact+numeric",
+    "gsm8k_acc": 0.54,
+    "gsm8k_hit_limit": 0.05,
+    "ifeval_subset_acc": 0.64,
+    "note": "IFEval-subset, not official"
+  },
+  "grade": {},
+  "wall_s": 10168.9,
+  "task": "loop_fix"
+}

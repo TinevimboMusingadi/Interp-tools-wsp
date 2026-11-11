@@ -1,0 +1,41 @@
+{
+  "cell": {
+    "id": "c0_b50_flash_s0",
+    "condition": "c0",
+    "budget": 50,
+    "provider": {
+      "kind": "gemini",
+      "model": "gemini-3.8-flash",
+      "short": "flash"
+    },
+    "seed": 0,
+    "variant": null
+  },
+  "agent": {
+    "run_id": "p1_replicate/c0_b50_flash_s0",
+    "stop_reason": "budget: p1_replicate__c0_b50_flash_s0: 4,082,734 tokens >= cap 4,000,000",
+    "turns": 84,
+    "submitted": null,
+    "answer": null,
+    "forward_used": 15,
+    "weights_changed": 2048,
+    "weights_total": 752393024,
+    "spent_usd": 3.1714,
+    "tokens": 4082734,
+    "jail_violations": 4
+  },
+  "eval": {
+    "math500_acc": 0.46,
+    "math500_hit_limit": 0.27,
+    "math500_mean_tokens": 3135.44,
+    "n": 100,
+    "grader": "wsp.eval.math exact+numeric",
+    "gsm8k_acc": 0.61,
+    "gsm8k_hit_limit": 0.07,
+    "ifeval_subset_acc": 0.67,
+    "note": "IFEval-subset, not official"
+  },
+  "grade": {},
+  "wall_s": 10249.1,
+  "task": "loop_fix"
+}
