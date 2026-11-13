@@ -187,10 +187,15 @@ def steer_test(env: Env, prompts: list[str], direction: str | list[float], layer
     v = _vec(env, direction).to(hf.device, hf.dtype)
     spec = SteerSpec(vector=v, layer=layer, coeff=coeff, method=SteerMethod(method), point=point,
                      normalize=method == "additive")
+    kw = dict(input_ids=ids, attention_mask=mask, do_sample=False, pad_token_id=tok.pad_token_id,
+              max_new_tokens=min(max_new_tokens, env.namespace.get("gen_cap", MAX_NEW_TOKENS)))
     with env.forward_window(1), torch.no_grad(), steer(env.model, [spec]):
-        out = hf.generate(input_ids=ids, attention_mask=mask, do_sample=False, pad_token_id=tok.pad_token_id,
-                          max_new_tokens=min(max_new_tokens, env.namespace.get("gen_cap", MAX_NEW_TOKENS)),
-                          **tpu_kwargs(hf))
+        try:
+            out = hf.generate(**kw, **tpu_kwargs(hf))
+        except Exception:  # noqa: BLE001 - steering + static cache failed on TorchTPU (p2 smoke); retry plain
+            if not tpu_kwargs(hf):
+                raise
+            out = hf.generate(**kw)
     texts = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
     return _left(env) + "\n" + "\n\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
 

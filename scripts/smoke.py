@@ -79,7 +79,7 @@ def main() -> int:
             passed = ok(out)
             failed += not passed
             print(f"[{'PASS' if passed else 'FAIL'}] {name} ({time.time() - t1:.1f}s)")
-            print("   " + out.strip().replace("\n", "\n   ")[:600])
+            print("   " + out.strip().replace("\n", "\n   ")[:600 if passed else 20000])
             if tool == "python" and out.startswith("FULL"):  # then exercise attention() on the first one
                 full = [int(x) for x in out.split("[", 1)[1].split("]", 1)[0].split(",") if x.strip()]
                 if full:
