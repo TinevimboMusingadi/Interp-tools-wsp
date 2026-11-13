@@ -5,6 +5,10 @@ models:
   # gemini-3.8-flash doubles to 1.50 / 7.50 from 2027-01-01: update this row before running after that date.
   gemini-3.8-flash:       {input_per_mtok: 0.75, output_per_mtok: 3.75, verified: true}
   gemini-3.1-pro-preview: {input_per_mtok: 2.0,  output_per_mtok: 12.0, verified: true}
+  # Gemini 4, read 2026-11-13 (same page). Argon and Carbon double to 4.00 / 20.00 from 2026-12-01.
+  gemini-4-carbon:        {input_per_mtok: 2.0,  output_per_mtok: 10.0, verified: true}
+  gemini-4-argon:         {input_per_mtok: 2.0,  output_per_mtok: 10.0, verified: true}
+  gemini-4-hydrogen:      {input_per_mtok: 1.5,  output_per_mtok: 7.5,  verified: true}
   # Claude via Vertex AI: not yet enabled in Model Garden for tpu-builder1. Fill in the Vertex price
   # and model ID once enabled; until then these rows are placeholders and refused for paid runs.
   claude-sonnet-5-5:      {input_per_mtok: 3.0,  output_per_mtok: 15.0, verified: false}

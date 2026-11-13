@@ -1,13 +1,16 @@
-# Phase 2.1 (core claim): interp tools vs paper baseline at matched forward-pass budgets.
+# Phase 2.1 (core claim): interp tools (c1) vs raw weights (c0) at matched forward-pass budgets.
+# First pass on the dev subsets with Gemini 4 (Carbon = most capable, Argon = efficient frontier), same
+# eval setup as p1 (100 problems per suite, 8k generation cap), so p1's baseline is reused.
+# Prices double on 2026-12-01: update prices.yaml before running after that date.
 id: p2_loop_fix
 task: loop_fix
-task_kwargs: {dev: false, device: tpu}
+task_kwargs: {dev: true, device: tpu, eval_max_new_tokens: 8192}
 conditions: [c0, c1]
-budgets: [10, 25, 50]
+budgets: [10, 25]
 providers:
-  - {kind: claude-vertex, model: claude-sonnet-5-5, short: sonnet}
-  - {kind: gemini, model: gemini-3.1-pro-preview, short: pro}
-seeds: [0, 1, 2]
+  - {kind: gemini, model: gemini-4-carbon, short: carbon}
+  - {kind: gemini, model: gemini-4-argon, short: argon}
+seeds: [0]
 baseline: true
-caps: {max_usd: 12, max_tokens: 5000000, max_turns: 160}
+caps: {max_usd: 15, max_tokens: 4000000, max_turns: 160}
 estimate: {turns: 60, input_tokens_per_turn: 30000, output_tokens_per_turn: 1500}
