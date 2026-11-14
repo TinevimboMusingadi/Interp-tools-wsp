@@ -126,6 +126,9 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
             with jail.armed():
                 out = env.call(msg[1], msg[2])
             conn.send(("ok", out))
+        elif op == "delta":  # what the last python call changed, for the transcript
+            conn.send(("ok", env.last_delta))
+            env.last_delta = {}
         elif op == "status":
             st = env.status()
             st["submitted"] = env.namespace.get("__submitted__")
@@ -209,6 +212,12 @@ class Sandbox:
     def status(self) -> dict:
         self.conn.send(("status",))
         return self._recv(60)[1]
+
+    def last_delta(self) -> dict:
+        """``{tensor: {n, shape, rows, cols}}`` changed by the last python call (empty if none)."""
+        self.conn.send(("delta",))
+        status, payload = self._recv(120)
+        return payload if status == "ok" else {}
 
     def evaluate(self, fn: str, timeout: float = 6 * 3600, **kwargs: Any) -> dict:
         """Run ``"module:function"(model, **kwargs)`` on the current (edited) weights. Ends agent use."""

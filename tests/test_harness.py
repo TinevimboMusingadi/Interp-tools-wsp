@@ -75,6 +75,24 @@ def test_agent_loop_end_to_end_in_sandbox(tmp_path, monkeypatch):
     assert res.stop_reason == "submitted" and res.submitted == "zeroed token 0"
     assert res.forward_used == 1 and res.weights_changed > 0  # lm_head is tied to wte
     assert (tmp_path / "t" / "transcript.jsonl").exists()
+    # the edit is logged exactly on its tool row (for the replay viewer); the read-only call has none
+    import json
+
+    rows = [json.loads(x) for x in (tmp_path / "t" / "transcript.jsonl").read_text().splitlines()]
+    py = [r for r in rows if r["kind"] == "tool" and r["name"] == "python"]
+    assert "weight_delta" not in py[0]
+    (name, d), = py[1]["weight_delta"].items()
+    assert d["rows"] == [0] and d["n"] > 0
+
+
+def test_weight_delta_per_python_call(env):
+    env.call("python", {"code": "print(1)"})
+    assert env.last_delta == {}
+    env.call("python", {"code": "model.hf_model.transformer.h[1].mlp.c_proj.weight.data[3, 5] += 1.0"})
+    (name, d), = env.last_delta.items()
+    assert name.endswith("h.1.mlp.c_proj.weight") and d["n"] == 1 and d["rows"] == [3] and d["cols"] == [5]
+    env.call("python", {"code": "x = 2"})
+    assert env.last_delta == {}  # nothing new changed in this call
 
 
 def test_jail_blocks_files_processes_and_network_but_not_tools(tmp_path):

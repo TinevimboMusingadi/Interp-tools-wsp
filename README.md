@@ -22,6 +22,7 @@ compute-matched, pre-registered experiments. The full write-up is in [`blog/`](b
 | `wsp/run.py`, `wsp/rsi.py` | Experiment runner (matrix, dry-run cost, resumable cells) and the recursive-improvement rounds |
 | `wsp/report.py`, `wsp/export.py` | REPORT.md tables plus a transcript audit, and SFT export of successful trajectories |
 | `wsp/edit/` | Weight-edit primitives (`orthogonalize_out`, `rank1`, `feature_edit`, …) and verification (`weight_diff`, `kl_on_text`) |
+| `wsp/studio/`, `studio/web/` | WSP Studio: replay and live view of agent runs on a network map, plus a hands-on interp and weight-editing app |
 | `experiments/` | One folder per pre-registered experiment |
 | `blog/` | GitHub Pages site: a living overview plus one post per experiment |
 
@@ -65,3 +66,20 @@ python -m wsp.export experiments/p2_loop_fix --metric math500_acc --min 0.3 --ou
 Expected API spend on the current placeholder prices is about $725 for all experiments. Each
 config's dry run prints its own estimate and worst case. Blog drafts live in `blog/_drafts/`, and the
 paper outline in `paper/`.
+
+## WSP Studio
+
+See weight-space programming happen. One page at http://localhost:8800 with three modes:
+
+- **Replay** a finished run. Tool calls and probes appear on the left. The network sits in the middle: embedding, then 24 layer columns (attention over MLP, with the residual stream between), then the tied unembedding. It lights up what each step reads (blue), steers (purple) or edits (orange), and a forward pass sweeps across in green. The agent's turns are on the right. Edited embedding rows show their tokens, for example Carbon's "Wait" and "Alternatively" edit in p2. You can play, scrub and change speed, and record a video.
+- **Live**: follow a run while its transcript is still being written. This works for local files, or for a TPU VM with `--ssh-vm wsp-p2`.
+- **Studio**: load the model and use the agent's own C1 tools by hand. It has chat (optionally steered), logit lens, attention grids, neuron readouts, contrast directions and their writers, weight edits with undo (scale rows or neurons, or bake a direction ablation into every writer), and a Python console.
+
+```bash
+cd studio/web && npm install && npm run build && cd ../..   # once
+python -m wsp.studio --runs runs                             # replay + live, no model needed
+python -m wsp.studio --runs runs --model Qwen/Qwen3.5-0.8B   # + hands-on studio (CPU load ~3 min)
+python -m wsp.studio.diff runs/p2_loop_fix                   # exact edit_diff.json from weights.pt (run where the weights are)
+```
+
+New runs log `weight_delta` (exact tensors, rows and columns) on every python tool call, so replay shows each edit exactly. Older runs fall back to the edit reports and a best-guess read of the agent's code, which is marked "guess".

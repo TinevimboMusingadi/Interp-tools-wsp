@@ -105,6 +105,9 @@ class Env:
         self.reference = self.references[self.default]
         self.namespace: dict[str, Any] = {"model": self.model, "models": self.models, "torch": torch,
                                           "__name__": "__agent__", "__builtins__": _guarded_builtins()}
+        self._params = [(k, n, p) for k, m in self.models.items() for n, p in m.hf_model.named_parameters()]
+        self._sums = self._checksums()
+        self.last_delta: dict = {}
         self._install_guards()
 
     # -- rules -------------------------------------------------------------------------------
@@ -187,6 +190,41 @@ class Env:
             return _clip(traceback.format_exc(limit=4))
         finally:
             self.model = self.models[self.default]
+            if name == "python":
+                self.last_delta = self._weight_delta()
+
+    # -- per-call edit record (for the transcript and the replay viewer) ----------------------------
+    @torch.no_grad()
+    def _checksums(self) -> torch.Tensor:
+        """One number per tensor, computed on device and fetched in one transfer: changes when the
+        tensor's values change (sum + sum of squares; a pure permutation would slip through)."""
+        if not self._params:
+            return torch.zeros(0)
+        vals = [p.detach().float().sum() + 0.5 * p.detach().float().square().sum() for _, _, p in self._params]
+        return torch.stack(vals).cpu()
+
+    @torch.no_grad()
+    def _weight_delta(self, cap: int = 4096) -> dict:
+        """Tensors this call changed, each with the rows / columns that now differ from the base
+        weights. Never raises: a failure here must not break the agent's run."""
+        try:
+            new = self._checksums()
+            changed = (new != self._sums).nonzero().flatten().tolist()
+            self._sums = new
+            out = {}
+            for i in changed:
+                k, name, p = self._params[i]
+                ch = p.detach().cpu() != self.references[k][name].to(p.dtype)
+                d: dict[str, Any] = {"n": int(ch.sum()), "shape": list(ch.shape)}
+                if ch.ndim == 2:
+                    d["rows"] = ch.any(1).nonzero().flatten()[:cap].tolist()
+                    d["cols"] = ch.any(0).nonzero().flatten()[:cap].tolist()
+                elif ch.ndim == 1:
+                    d["rows"] = ch.nonzero().flatten()[:cap].tolist()
+                out[name if len(self.models) == 1 else f"{k}:{name}"] = d
+            return out
+        except Exception:  # noqa: BLE001
+            return {}
 
     def _diffs(self) -> dict:
         return {k: weight_diff(self.references[k], m.hf_model.named_parameters()) for k, m in self.models.items()}

@@ -69,7 +69,12 @@ def run_agent(*, run_id: str, provider: Provider, sandbox: Sandbox, system: str,
         results = []
         for call in turn.tool_calls:
             out = sandbox.call(call.name, call.args)
-            tr.log("tool", turn=turns, name=call.name, args=call.args, output=out)
+            extra = {}
+            if call.name == "python" and hasattr(sandbox, "last_delta"):  # exact edit, for replay
+                delta = sandbox.last_delta()
+                if delta:
+                    extra["weight_delta"] = delta
+            tr.log("tool", turn=turns, name=call.name, args=call.args, output=out, **extra)
             results.append(ToolResult(call.id, call.name, out))
         used = max(budget.tokens / budget.max_tokens, budget.spent_usd / budget.max_usd)
         if used >= 0.75 and not warned:  # one warning, so a run ends with a submission, not a cap
