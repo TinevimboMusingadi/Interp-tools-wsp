@@ -86,8 +86,10 @@ function render(
 ): Hit[] {
   const out: Hit[] = [];
   g.clearRect(0, 0, W, H);
-  g.fillStyle = "#0b0f17";
+  g.fillStyle = "#fbfbfc";
   g.fillRect(0, 0, W, H);
+  g.fillStyle = "#e3e6eb"; // faint dot grid
+  for (let gx = 12; gx < W; gx += 22) for (let gy = 12; gy < H; gy += 22) g.fillRect(gx, gy, 1.2, 1.2);
 
   const n = Math.max(1, arch.n_layers);
   const pad = 16;
@@ -107,11 +109,11 @@ function render(
   const colX = (L: number) => x0 + colW * L + (colW - bw) / 2;
 
   // caption
-  g.fillStyle = "#e6edf3";
-  g.font = "600 15px Inter, system-ui, sans-serif";
+  g.fillStyle = "#0f172a";
+  g.font = "600 15px 'Inter Variable', Inter, system-ui, sans-serif";
   g.fillText(caption, pad, pad + 16, W - 260);
-  g.fillStyle = "#8b98a9";
-  g.font = "12px Inter, system-ui, sans-serif";
+  g.fillStyle = "#64748b";
+  g.font = "12px 'Inter Variable', Inter, system-ui, sans-serif";
   g.fillText(sub, pad, pad + 34, W - 260);
   legend(g, W - pad, pad + 12);
 
@@ -121,7 +123,7 @@ function render(
   const fresh = Math.max(0, 1 - age / 1.2);
 
   // residual stream
-  g.strokeStyle = "#263247";
+  g.strokeStyle = "#d5d9e0";
   g.lineWidth = 3;
   g.beginPath();
   g.moveTo(pad + sideW, residY);
@@ -134,8 +136,8 @@ function render(
     const p = (age % 1.6) / 1.6;
     const sx = pad + (W - 2 * pad) * p;
     const grad = g.createLinearGradient(sx - 80, 0, sx + 20, 0);
-    grad.addColorStop(0, "rgba(126,231,135,0)");
-    grad.addColorStop(1, "rgba(126,231,135,0.22)");
+    grad.addColorStop(0, "rgba(22,163,74,0)");
+    grad.addColorStop(1, "rgba(22,163,74,0.13)");
     g.fillStyle = grad;
     g.fillRect(sx - 80, top - 6, 100, hh + 12);
   }
@@ -146,8 +148,8 @@ function render(
     base(g, x, top, sideW, hh, heat.edit.get(k) ?? 0, heat.everRead.get(k) ?? 0, false);
     const f = flashFor(part, null);
     for (const t of f) glow(g, x, top, sideW, hh, COLORS[t.mode], pulse);
-    g.fillStyle = "#8b98a9";
-    g.font = "11px Inter, system-ui, sans-serif";
+    g.fillStyle = "#64748b";
+    g.font = "11px 'Inter Variable', Inter, system-ui, sans-serif";
     g.textAlign = "center";
     g.fillText(label, x + sideW / 2, bottom + 17);
     g.textAlign = "left";
@@ -174,8 +176,8 @@ function render(
     const ka = key("attn", L);
     base(g, x, attnY, bw, attnH, heat.edit.get(ka) ?? 0, heat.everRead.get(ka) ?? 0, full);
     if (colW > 14) {
-      g.fillStyle = full ? "#c9d1d9" : "#56657a";
-      g.font = `${full ? 600 : 400} ${Math.min(11, colW * 0.4)}px Inter, system-ui, sans-serif`;
+      g.fillStyle = full ? "#334155" : "#a0abbb";
+      g.font = `${full ? 600 : 400} ${Math.min(11, colW * 0.4)}px 'Inter Variable', Inter, system-ui, sans-serif`;
       g.textAlign = "center";
       g.fillText(full ? "F" : "L", x + bw / 2, attnY + 13);
       g.textAlign = "left";
@@ -196,7 +198,7 @@ function render(
     // residual node
     const kr = key("resid", L);
     const rcount = heat.everRead.get(kr) ?? 0;
-    g.fillStyle = rcount ? `rgba(76,201,240,${Math.min(0.9, 0.25 + rcount * 0.1)})` : "#263247";
+    g.fillStyle = rcount ? `rgba(2,132,199,${Math.min(0.9, 0.3 + rcount * 0.1)})` : "#cbd2dc";
     g.beginPath();
     g.arc(x + bw / 2, residY, Math.max(3, Math.min(6, colW * 0.18)), 0, Math.PI * 2);
     g.fill();
@@ -239,8 +241,8 @@ function render(
 
     // labels + hit boxes
     if (colW > 16 || L % 2 === 0) {
-      g.fillStyle = full ? "#c9d1d9" : "#56657a";
-      g.font = "10px Inter, system-ui, sans-serif";
+      g.fillStyle = full ? "#334155" : "#a0abbb";
+      g.font = "10px 'Inter Variable', Inter, system-ui, sans-serif";
       g.textAlign = "center";
       g.fillText(String(L), x + bw / 2, bottom + 17);
       g.textAlign = "left";
@@ -263,17 +265,17 @@ function reads(heat: Heat, k: string) {
 
 function base(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, edit: number, read: number, strong: boolean) {
   rr(g, x, y, w, h, 5);
-  g.fillStyle = "#141b29";
+  g.fillStyle = "#eef1f5";
   g.fill();
   if (read) {
-    g.fillStyle = `rgba(76,201,240,${Math.min(0.28, 0.05 + read * 0.035)})`;
+    g.fillStyle = `rgba(2,132,199,${Math.min(0.2, 0.04 + read * 0.03)})`;
     g.fill();
   }
   if (edit) {
-    g.fillStyle = `rgba(255,122,69,${0.25 + 0.6 * edit})`;
+    g.fillStyle = `rgba(234,88,12,${0.14 + 0.46 * edit})`;
     g.fill();
   }
-  g.strokeStyle = strong ? "#5b6b85" : "#2a3550";
+  g.strokeStyle = strong ? "#94a3b8" : "#d5d9e0";
   g.lineWidth = strong ? 1.5 : 1;
   g.stroke();
 }
@@ -281,7 +283,7 @@ function base(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 function glow(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, a: number) {
   g.save();
   g.shadowColor = color;
-  g.shadowBlur = 22 * a;
+  g.shadowBlur = 14 * a;
   g.strokeStyle = color;
   g.globalAlpha = 0.5 + 0.5 * a;
   g.lineWidth = 2.5;
@@ -292,25 +294,25 @@ function glow(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 
 function chip(g: CanvasRenderingContext2D, x: number, y: number, w: number, label: string, color: string) {
   rr(g, x, y, w, 16, 8);
-  g.fillStyle = color + "33";
+  g.fillStyle = color + "1f";
   g.fill();
   g.strokeStyle = color;
   g.lineWidth = 1;
   g.stroke();
-  g.fillStyle = "#f0f3f6";
-  g.font = "10.5px ui-monospace, Consolas, monospace";
+  g.fillStyle = "#0f172a";
+  g.font = "500 10.5px \"JetBrains Mono Variable\", ui-monospace, Consolas, monospace";
   const text = JSON.stringify(label).slice(1, -1);
   g.fillText(text.length > 12 ? text.slice(0, 11) + "…" : text, x + 6, y + 11.5, w - 10);
 }
 
 function legend(g: CanvasRenderingContext2D, right: number, y: number) {
   const items: [string, string][] = [["read", COLORS.read], ["steer", COLORS.steer], ["edit", COLORS.edit], ["forward pass", COLORS.run]];
-  g.font = "11px Inter, system-ui, sans-serif";
+  g.font = "11px 'Inter Variable', Inter, system-ui, sans-serif";
   let x = right;
   for (const [label, col] of items.reverse()) {
     const w = g.measureText(label).width;
     x -= w;
-    g.fillStyle = "#8b98a9";
+    g.fillStyle = "#64748b";
     g.fillText(label, x, y + 4);
     x -= 14;
     g.fillStyle = col;

@@ -74,10 +74,10 @@ export function heatUpTo(steps: Step[], upto: number, arch: Arch): Heat {
 }
 
 export const COLORS = {
-  read: "#4cc9f0",
-  edit: "#ff7a45",
-  state: "#ffb347",
-  steer: "#b388ff",
-  run: "#7ee787",
-  error: "#ff4d6d",
+  read: "#0284c7",
+  edit: "#ea580c",
+  state: "#d97706",
+  steer: "#7c3aed",
+  run: "#16a34a",
+  error: "#dc2626",
 };

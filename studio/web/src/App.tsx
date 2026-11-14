@@ -195,8 +195,8 @@ export default function App() {
           <button className="rec on" onClick={() => rec.stop()}>■ Stop recording</button>
         ) : (
           <>
-            <button className="rec" onClick={() => startRec("screen")} title="record the whole page (pick this tab)">● Record video</button>
-            <button className="rec ghost" onClick={() => startRec("map")} title="record just the network map">● Map only</button>
+            <button className="rec" onClick={() => startRec("screen")} title="record the whole page (pick this tab)">● Record</button>
+            <button className="rec ghost" onClick={() => startRec("map")} title="record just the network map">Map only</button>
           </>
         )}
       </header>

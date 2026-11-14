@@ -159,7 +159,7 @@ export function Lens({ lens }: { lens: LensTable }) {
         <div key={L} className="lens-row">
           <span className="lens-l">L{L}</span>
           {lens.rows[r].map((c, j) => (
-            <span key={j} className="lens-c" style={{ background: `rgba(76,201,240,${0.12 + c.p * 0.8})` }} title={`${(c.p * 100).toFixed(1)}%`}>
+            <span key={j} className="lens-c" style={{ background: `rgba(2,132,199,${0.06 + c.p * 0.55})` }} title={`${(c.p * 100).toFixed(1)}%`}>
               {JSON.stringify(c.tok).slice(1, -1)}
             </span>
           ))}
@@ -187,7 +187,7 @@ export function Attention({ grid }: { grid: AttnGrid }) {
           <div key={q} style={{ display: "contents" }}>
             <span className="attn-tok">{JSON.stringify(grid.tokens[q] ?? "").slice(1, -1)}</span>
             {row.map((p, k) => (
-              <span key={k} style={{ width: cell, height: cell, background: `rgba(179,136,255,${p})` }} title={`${grid.tokens[q]} → ${grid.tokens[k]}: ${p}`} />
+              <span key={k} style={{ width: cell, height: cell, background: `rgba(124,58,237,${p})` }} title={`${grid.tokens[q]} → ${grid.tokens[k]}: ${p}`} />
             ))}
           </div>
         ))}
