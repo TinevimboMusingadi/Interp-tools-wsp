@@ -80,6 +80,8 @@ cd studio/web && npm install && npm run build && cd ../..   # once
 python -m wsp.studio --runs runs                             # replay + live, no model needed
 python -m wsp.studio --runs runs --model Qwen/Qwen3.5-0.8B   # + hands-on studio (CPU load ~3 min)
 python -m wsp.studio.diff runs/p2_loop_fix                   # exact edit_diff.json from weights.pt (run where the weights are)
+python scripts/export_replays.py runs/p2_loop_fix           # replay files for the blog embed (blog/studio/replays)
+cd studio/web && npm run build:blog                         # static Studio for the blog (blog/studio/app)
 ```
 
 New runs log `weight_delta` (exact tensors, rows and columns) on every python tool call, so replay shows each edit exactly. Older runs fall back to the edit reports and a best-guess read of the agent's code, which is marked "guess".

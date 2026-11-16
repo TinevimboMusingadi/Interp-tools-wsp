@@ -1,6 +1,8 @@
 title: Interp Tools for Weight-Space Programming
 description: Interpretability tools as the harness for LLMs that read and write neural network weights.
 author: Tinevimbo Musingadi
+baseurl: /Interp-tools-wsp
+url: https://tinevimbomusingadi.github.io
 theme: minima
 permalink: /:year/:month/:title/
 markdown: kramdown

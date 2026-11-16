@@ -19,7 +19,7 @@ changes when the agent gets the interpretability toolkit a human researcher woul
 
 | # | Claim | Status | Post |
 |---|-------|--------|------|
-| 1 | Interp tools make weight edits better and cheaper (fewer forward passes, fewer side effects) | not yet run | – |
+| 1 | Interp tools make weight edits better and cheaper (fewer forward passes, fewer side effects) | first pass, 1 seed: no difference yet (best edit was C0, MATH 41% → 47%) | [Post 2]({{ '/2026/11/a-debugger-for-weight-space-programming/' | relative_url }}) |
 | 2 | Edits made through interp tools teach us about the model | not yet run | – |
 | 3 | Agents that build their own interp tools get better at editing (recursive improvement) | not yet run | – |
 | 4 | The loop scales to larger models and to alignment auditing | not yet run | – |

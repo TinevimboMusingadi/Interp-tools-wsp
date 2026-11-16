@@ -1,0 +1,47 @@
+/* Interactive figures for the p2 post. Light, self-contained, no dependencies. */
+.wsp-fig {
+  --ink: #0f172a; --ink2: #334155; --dim: #64748b; --line: #e6e8ec; --soft: #f7f8fa;
+  --c0: #64748b; --c1: #4f46e5; --edit: #ea580c; --run: #16a34a;
+  font: 14px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 16px 18px 14px; margin: 1.6em 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .04);
+}
+.wsp-fig h4 { margin: 0 0 2px; font-size: 15px; font-weight: 650; }
+.wsp-fig .sub { color: var(--dim); font-size: 12.5px; margin: 0 0 12px; }
+.wsp-fig .seg { display: inline-flex; gap: 2px; padding: 3px; background: #f1f3f6; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.wsp-fig .seg button { font: inherit; font-size: 12.5px; border: 0; background: transparent; color: var(--dim); padding: 4px 12px; border-radius: 7px; cursor: pointer; }
+.wsp-fig .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, .1); font-weight: 600; }
+.wsp-fig .rows { position: relative; }
+.wsp-fig .row { display: grid; grid-template-columns: 150px 1fr 54px; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; cursor: pointer; }
+.wsp-fig .row:hover, .wsp-fig .row.sel { background: var(--soft); }
+.wsp-fig .row.sel { box-shadow: inset 0 0 0 1px #c7d2fe; }
+.wsp-fig .lab { font-size: 12.5px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsp-fig .lab b { font-weight: 650; }
+.wsp-fig .track { position: relative; height: 18px; background: #f1f3f6; border-radius: 5px; }
+.wsp-fig .bar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; transition: width .45s cubic-bezier(.2, .8, .2, 1); }
+.wsp-fig .bar.c0 { background: var(--c0); }
+.wsp-fig .bar.c1 { background: var(--c1); }
+.wsp-fig .bar.bad { background: repeating-linear-gradient(45deg, #cbd2dc 0 4px, #e5e8ed 4px 8px); }
+.wsp-fig .base { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 2px dashed var(--ink); opacity: .55; transition: left .45s; }
+.wsp-fig .val { font: 600 12.5px/1 "JetBrains Mono", ui-monospace, Consolas, monospace; text-align: right; color: var(--ink); }
+.wsp-fig .grp { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--dim); margin: 10px 6px 2px; }
+.wsp-fig .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--dim); margin-top: 10px; }
+.wsp-fig .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.wsp-fig .card { margin-top: 12px; padding: 12px 14px; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; font-size: 13.5px; color: var(--ink2); }
+.wsp-fig .card h5 { margin: 0 0 6px; font-size: 14px; color: var(--ink); }
+.wsp-fig .stats { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
+.wsp-fig .stat { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+.wsp-fig .stat b { font-variant-numeric: tabular-nums; }
+.wsp-fig .go { font: inherit; font-weight: 600; font-size: 13px; color: #fff; background: var(--c1); border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; margin-top: 4px; }
+.wsp-fig .go:hover { background: #4338ca; }
+.wsp-fig .stack { display: flex; height: 18px; border-radius: 5px; overflow: hidden; background: #f1f3f6; }
+.wsp-fig .stack span { display: block; height: 100%; transition: width .45s; }
+.wsp-studio { margin: 1.6em 0; border: 1px solid var(--line, #e6e8ec); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .04); background: #fff; }
+.wsp-studio iframe { display: block; width: 100%; height: 560px; border: 0; }
+.wsp-studio .cap { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 14px; font: 12.5px/1.4 "Inter", system-ui, sans-serif; color: #64748b; border-top: 1px solid #e6e8ec; background: #f7f8fa; flex-wrap: wrap; }
+.wsp-studio .cap a { font-weight: 600; color: #4f46e5; text-decoration: none; }
+@media (max-width: 600px) {
+  .wsp-fig { padding: 12px; }
+  .wsp-fig .row { grid-template-columns: 104px 1fr 44px; gap: 6px; }
+  .wsp-studio iframe { height: 480px; }
+}

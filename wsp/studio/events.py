@@ -70,6 +70,22 @@ def _loop_range(code: str, var: str) -> list[int] | None:
     m = re.search(rf"for\s+{re.escape(var)}\s+in\s+\[([\d,\s]+)\]", code)
     if m:
         return [int(x) for x in m.group(1).split(",") if x.strip()]
+    # for l in layers_list: where layers_list is a function parameter; take the layers from a call site,
+    # e.g. apply_ortho(list(range(6, 23)), ...) or apply([18, 20])
+    m = re.search(rf"for\s+{re.escape(var)}\s+in\s+([A-Za-z_]\w*)\s*:", code)
+    if m:
+        param = m.group(1)
+        d = re.search(rf"def\s+(\w+)\s*\(([^)]*\b{re.escape(param)}\b[^)]*)\)", code)
+        if d:
+            for call in re.finditer(rf"(?<!def )\b{re.escape(d.group(1))}\s*\(([^\n]*)", code):
+                args = call.group(1)
+                r = re.search(r"range\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\)", args)
+                if r:
+                    a, b = (0, int(r.group(1))) if r.group(2) is None else (int(r.group(1)), int(r.group(2)))
+                    return list(range(a, b))
+                r = re.search(r"\[([\d,\s]+)\]", args)
+                if r:
+                    return [int(x) for x in r.group(1).split(",") if x.strip()]
     return None
 
 
@@ -92,6 +108,8 @@ def touch(part: str, layer: int | None, mode: str, index: Iterable[int] | None =
 def code_touches(code: str) -> list[dict]:
     """Best-guess touches from agent Python, line by line (an edit op on a line edits what it names)."""
     out: list[dict] = []
+    # simple aliases: layer_mod = model.layers[l]; attn_w = layer_mod.self_attn.o_proj.weight
+    alias: dict[str, tuple[set[str], list[int] | None]] = {}
     for line in code.splitlines():
         s = line.split("#", 1)[0]
         if not s.strip():
@@ -101,6 +119,18 @@ def code_touches(code: str) -> list[dict]:
         if layers is None:
             for var in LAYER_VAR.findall(s):
                 layers = _loop_range(code, var)
+        inherited: set[str] = set()
+        for name, (aparts, alayers) in alias.items():
+            if re.search(rf"\b{re.escape(name)}\b", s):
+                inherited |= aparts
+                layers = layers or alayers
+        asg = re.match(r"\s*([A-Za-z_]\w*)\s*=(?!=)\s*(.+)", s)
+        if asg:
+            rhs = asg.group(2)
+            rhs_parts = {p for p, rx in (("mlp", r"\.mlp\b|down_proj|up_proj|gate_proj"),
+                                        ("attn", r"self_attn|linear_attn|o_proj|out_proj")) if re.search(rx, rhs)}
+            if rhs_parts or layers:
+                alias[asg.group(1)] = (rhs_parts or inherited, layers)
         parts: list[tuple[str, list[int] | None]] = []
         if "embed_tokens" in s:
             idx = _ints(" ".join(re.findall(r"embed_tokens\.weight(?:\.data)?\[\s*([\d,\s\[\]]+)\]", s)))
@@ -112,9 +142,10 @@ def code_touches(code: str) -> list[dict]:
             parts.append(("embed", idx or None))
         if "lm_head" in s:
             parts.append(("head", None))
-        if re.search(r"\.mlp\b|down_proj|up_proj|gate_proj", s):
+        if re.search(r"\.mlp\b|down_proj|up_proj|gate_proj", s) or ("mlp" in inherited and mode == "edit"):
             parts.append(("mlp", None))
-        if re.search(r"self_attn|linear_attn|o_proj|q_proj|k_proj|v_proj|out_proj|in_proj", s):
+        if re.search(r"self_attn|linear_attn|o_proj|q_proj|k_proj|v_proj|out_proj|in_proj", s) or (
+                "attn" in inherited and mode == "edit"):
             parts.append(("attn", None))
         if re.search(r"layernorm", s):
             parts.append(("norm", None))

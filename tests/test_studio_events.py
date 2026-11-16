@@ -96,3 +96,17 @@ def test_arch_reads_nested_config():
     assert FALLBACK["n_layers"] == 24 and FALLBACK["layer_types"][3] == "full"
     a = arch_from_config({"num_hidden_layers": 2, "hidden_size": 8, "intermediate_size": 16, "vocab_size": 10})
     assert a["layer_types"] == ["full", "full"] and a["d_mlp"] == 16
+
+
+def test_code_touches_follows_aliases_and_call_site_layers():
+    code = (
+        "def apply_ortho(layers_list, strength=1.0):\n"
+        "    for l in layers_list:\n"
+        "        layer_mod = model.hf_model.model.layers[l]\n"
+        "        attn_w = layer_mod.self_attn.o_proj.weight\n"
+        "        wsp.edit.feature_edit(attn_w, u, mode='remove')\n"
+        "        wsp.edit.feature_edit(layer_mod.mlp.down_proj.weight, u, mode='remove')\n"
+        "apply_ortho(list(range(6, 9)), strength=1.0)\n"
+    )
+    edits = {(t["part"], t["layer"]) for t in code_touches(code) if t["mode"] == "edit"}
+    assert edits == {(p, L) for p in ("attn", "mlp") for L in (6, 7, 8)}

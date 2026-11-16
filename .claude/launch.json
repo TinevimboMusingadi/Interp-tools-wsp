@@ -4,13 +4,31 @@
     {
       "name": "wsp-studio",
       "runtimeExecutable": "D:/Interp-tools-wsp/.venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "wsp.studio", "--runs", "runs", "--port", "8800"],
+      "runtimeArgs": [
+        "-m",
+        "wsp.studio",
+        "--runs",
+        "runs",
+        "--port",
+        "8800"
+      ],
       "port": 8800
     },
     {
       "name": "wsp-studio-model",
       "runtimeExecutable": "D:/Interp-tools-wsp/.venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "wsp.studio", "--runs", "runs", "--port", "8801", "--model", "Qwen/Qwen3.5-0.8B", "--device", "cpu"],
+      "runtimeArgs": [
+        "-m",
+        "wsp.studio",
+        "--runs",
+        "runs",
+        "--port",
+        "8801",
+        "--model",
+        "Qwen/Qwen3.5-0.8B",
+        "--device",
+        "cpu"
+      ],
       "port": 8801
     }
   ]

@@ -111,10 +111,10 @@ function render(
   // caption
   g.fillStyle = "#0f172a";
   g.font = "600 15px 'Inter Variable', Inter, system-ui, sans-serif";
-  g.fillText(caption, pad, pad + 16, W - 260);
+  g.fillText(caption, pad, pad + 16, W - 320);
   g.fillStyle = "#64748b";
   g.font = "12px 'Inter Variable', Inter, system-ui, sans-serif";
-  g.fillText(sub, pad, pad + 34, W - 260);
+  g.fillText(sub, pad, pad + 34, W - 2 * pad);
   legend(g, W - pad, pad + 12);
 
   const flashFor = (part: string, layer: number | null) =>

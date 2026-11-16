@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { api, STATIC } from "./api";
 import { applyStep, emptyHeat, heatUpTo } from "./heat";
 import { caption, pct } from "./describe";
 import { NetworkMap } from "./components/NetworkMap";
@@ -10,6 +10,10 @@ import { recordMap, recordScreen, type Recording } from "./recorder";
 import type { Arch, Evals, RunData, RunInfo, Step, Touch } from "./types";
 
 type Mode = "replay" | "live" | "studio";
+
+// URL options (used by the blog embed): ?run=<exp>/<cell>&embed=1&play=1&speed=2&step=N
+const Q = new URLSearchParams(window.location.search);
+const EMBED = Q.get("embed") === "1";
 
 function stepDelay(s?: Step): number {
   if (!s) return 1000;
@@ -29,7 +33,7 @@ export default function App() {
   const [arch, setArch] = useState<Arch | null>(null);
   const [cur, setCur] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(2);
+  const [speed, setSpeed] = useState(Number(Q.get("speed")) || 2);
   const [follow, setFollow] = useState(true);
   const [rec, setRec] = useState<Recording | null>(null);
   const [err, setErr] = useState("");
@@ -43,7 +47,8 @@ export default function App() {
   useEffect(() => {
     api.runs().then((r) => {
       setRuns(r);
-      const pick = r.find((x) => x.cell.includes("carbon") && x.weights_changed) ?? r[r.length - 1];
+      const want = Q.get("run");
+      const pick = r.find((x) => x.id === want) ?? r.find((x) => x.cell.includes("carbon") && x.weights_changed) ?? r[r.length - 1];
       if (pick) setRunId(pick.id);
     }).catch((e) => setErr(String(e)));
     api.arch().then(setArch).catch(() => {});
@@ -58,7 +63,9 @@ export default function App() {
       setData(d);
       setSteps(d.steps);
       setArch(d.arch);
-      setCur(0);
+      const first = Q.get("step");
+      setCur(first && runId === Q.get("run") ? Math.min(d.steps.length - 1, Number(first)) : 0);
+      if (Q.get("play") === "1" && runId === (Q.get("run") ?? runId)) setPlaying(true);
     }).catch((e) => setErr(String(e)));
   }, [runId, mode]);
 
@@ -153,11 +160,11 @@ export default function App() {
   }, [runs]);
 
   return (
-    <div className="app">
+    <div className={`app${EMBED ? " embed" : ""}${STATIC ? " static" : ""}`}>
       <header>
         <div className="brand">WSP <span>Studio</span></div>
         <div className="modes">
-          {(["replay", "live", "studio"] as Mode[]).map((m) => (
+          {(STATIC ? ["replay"] as Mode[] : ["replay", "live", "studio"] as Mode[]).map((m) => (
             <button key={m} className={m === mode ? "on" : ""} onClick={() => { setMode(m); setPlaying(false); }}>
               {m === "replay" ? "Replay" : m === "live" ? "Live" : "Studio"}
             </button>
@@ -191,7 +198,10 @@ export default function App() {
           <div className="evals"><span className="eval">{studio.model} · {studio.device} · {sState.n_changed.toLocaleString()} weights edited</span></div>
         )}
         <span className="grow" />
-        {rec ? (
+        {EMBED && (
+          <a className="full" href={`?run=${encodeURIComponent(runId)}&step=${cur}`} target="_blank" rel="noopener">Open full Studio ↗</a>
+        )}
+        {EMBED ? null : rec ? (
           <button className="rec on" onClick={() => rec.stop()}>■ Stop recording</button>
         ) : (
           <>
