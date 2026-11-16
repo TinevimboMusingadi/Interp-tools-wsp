@@ -72,13 +72,14 @@ replaying the real transcripts.
 
 **C0 Carbon, the winning edit.** Carbon read the embedding matrix directly. It noticed the
 unembedding is tied to it, and found an "average token" direction. Then it scaled down eight token
-rows and nudged them toward that average:
+rows and nudged them toward that average. For *Wait*, *Alternatively* and *Alternative*, it edited
+both forms of the token, with and without a leading space:
 
 | Token | Kept | Pushed toward average |
 |---|---|---|
-| `Wait`, ` Wait` | 72% | +0.12 |
-| `Alternatively`, ` Alternatively` | 72% | +0.12 |
-| `Alternative`, ` Alternative` | 78% | +0.10 |
+| `Wait` | 72% | +0.12 |
+| `Alternatively` | 72% | +0.12 |
+| `Alternative` | 78% | +0.10 |
 | `-check` (as in re-check) | 80% | +0.08 |
 | `-read` (as in re-read) | 80% | +0.08 |
 
