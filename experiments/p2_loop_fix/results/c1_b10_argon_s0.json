@@ -1,0 +1,41 @@
+{
+  "cell": {
+    "id": "c1_b10_argon_s0",
+    "condition": "c1",
+    "budget": 10,
+    "provider": {
+      "kind": "gemini",
+      "model": "gemini-4-argon",
+      "short": "argon"
+    },
+    "seed": 0,
+    "variant": null
+  },
+  "agent": {
+    "run_id": "p2_loop_fix/c1_b10_argon_s0",
+    "stop_reason": "budget: p2_loop_fix__c1_b10_argon_s0: 4,108,203 tokens >= cap 4,000,000",
+    "turns": 69,
+    "submitted": null,
+    "answer": null,
+    "forward_used": 6,
+    "weights_changed": 5118,
+    "weights_total": 752393024,
+    "spent_usd": 8.4309,
+    "tokens": 4108203,
+    "jail_violations": 2
+  },
+  "eval": {
+    "math500_acc": 0.4,
+    "math500_hit_limit": 0.29,
+    "math500_mean_tokens": 3080.48,
+    "n": 100,
+    "grader": "wsp.eval.math exact+numeric",
+    "gsm8k_acc": 0.6,
+    "gsm8k_hit_limit": 0.06,
+    "ifeval_subset_acc": 0.63,
+    "note": "IFEval-subset, not official"
+  },
+  "grade": {},
+  "wall_s": 11408.8,
+  "task": "loop_fix"
+}

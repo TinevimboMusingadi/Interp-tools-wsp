@@ -1,0 +1,42 @@
+{
+  "cell": {
+    "id": "c0_b25_carbon_s0",
+    "condition": "c0",
+    "budget": 25,
+    "provider": {
+      "kind": "gemini",
+      "model": "gemini-4-carbon",
+      "short": "carbon"
+    },
+    "seed": 0,
+    "variant": null
+  },
+  "agent": {
+    "run_id": "p2_loop_fix/c0_b25_carbon_s0",
+    "stop_reason": "budget: p2_loop_fix__c0_b25_carbon_s0: 4,100,536 tokens >= cap 4,000,000",
+    "turns": 50,
+    "submitted": null,
+    "answer": null,
+    "forward_used": 10,
+    "weights_changed": 0,
+    "weights_total": 752393024,
+    "spent_usd": 8.7184,
+    "tokens": 4100536,
+    "jail_violations": 2
+  },
+  "eval": {
+    "math500_acc": 0.41,
+    "math500_hit_limit": 0.28,
+    "math500_mean_tokens": 2952.68,
+    "n": 100,
+    "grader": "wsp.eval.math exact+numeric",
+    "gsm8k_acc": 0.58,
+    "gsm8k_hit_limit": 0.07,
+    "ifeval_subset_acc": 0.67,
+    "note": "IFEval-subset, not official",
+    "reused_from": "baseline.json"
+  },
+  "grade": {},
+  "wall_s": 3364.6,
+  "task": "loop_fix"
+}
