@@ -21,6 +21,8 @@ export type Step = {
   budget: number | null;
   tokens: number;
   text?: string;
+  thinking?: string;
+  finish?: string;
   calls?: { name: string; args: unknown }[];
   tool?: string;
   args?: Record<string, unknown>;

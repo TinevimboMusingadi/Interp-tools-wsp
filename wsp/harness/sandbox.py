@@ -129,6 +129,8 @@ def _worker(conn: Any, loader: str, loader_kwargs: dict, toolset: str, forward_b
         elif op == "delta":  # what the last python call changed, for the transcript
             conn.send(("ok", env.last_delta))
             env.last_delta = {}
+        elif op == "passes":  # cheap, every turn: status() diffs every weight
+            conn.send(("ok", {"forward_used": env.forward_used, "forward_budget": env.forward_budget}))
         elif op == "status":
             st = env.status()
             st["submitted"] = env.namespace.get("__submitted__")
@@ -212,6 +214,12 @@ class Sandbox:
     def status(self) -> dict:
         self.conn.send(("status",))
         return self._recv(60)[1]
+
+    def passes(self) -> dict:
+        """``{forward_used, forward_budget}`` without the weight diff ``status()`` computes."""
+        self.conn.send(("passes",))
+        status, payload = self._recv(60)
+        return payload if status == "ok" else {}
 
     def last_delta(self) -> dict:
         """``{tensor: {n, shape, rows, cols}}`` changed by the last python call (empty if none)."""

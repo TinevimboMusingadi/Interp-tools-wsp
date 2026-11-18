@@ -26,8 +26,8 @@ the network are not available. Call `submit` when done."""
 
 TOOL_NOTES = {
     "c0": "Tools: `python` (weights are free to read and edit), `generate` (one forward pass per batch), "
-          "`edit_report`, `submit`.",
-    "c1": "Tools: `python`, `generate`, `edit_report`, `submit`, plus interpretability tools. Free (weights "
+          "`check_practice` (score the current weights on a fresh practice sample), `edit_report`, `submit`.",
+    "c1": "Tools: `python`, `generate`, `check_practice`, `edit_report`, `submit`, plus interpretability tools. Free (weights "
           "only): `neuron_logits`, `direction_logits`, `writers_of`. One forward pass each: `capture`, "
           "`logit_lens`, `attention`, `contrast_direction`, `steer_test` (preview adding/ablating a direction "
           "without editing weights). Results are stored in `ws` for further analysis in `python`.",
@@ -107,14 +107,18 @@ QWEN_SAMPLING = {"max_new_tokens": 32768, "temperature": 0.6, "top_p": 0.95, "to
 GEMMA_SAMPLING = {"max_new_tokens": 8192, "temperature": 1.0, "top_p": 0.95, "top_k": 64}
 
 
-def _math_suites(sampling: dict, n: int | None) -> list[dict]:
-    return [{"fn": "math500", "kwargs": {"n": n, "sampling": sampling}},
-            {"fn": "gsm8k", "kwargs": {"n": n, "sampling": sampling}},
-            {"fn": "ifeval_subset", "kwargs": {"n": n, "sampling": sampling}}]
+def _math_suites(sampling: dict, n: int | dict | None) -> list[dict]:
+    """``n`` per suite: one number for all, or ``{"math500": None, "gsm8k": 300, ...}`` (None = full set)."""
+    per = n if isinstance(n, dict) else {}
+    pick = lambda k: per.get(k) if isinstance(n, dict) else n  # noqa: E731
+    return [{"fn": "math500", "kwargs": {"n": pick("math500"), "sampling": sampling}},
+            {"fn": "gsm8k", "kwargs": {"n": pick("gsm8k"), "sampling": sampling}},
+            {"fn": "ifeval_subset", "kwargs": {"n": pick("ifeval_subset"), "sampling": sampling}}]
 
 
 def loop_fix(dev: bool = True, device: str = "cpu", model_id: str = QWEN, dtype: str = "bfloat16",
-             saes: list[dict] | None = None, eval_max_new_tokens: int | None = None) -> Task:
+             saes: list[dict] | None = None, eval_max_new_tokens: int | None = None,
+             eval_n: dict | None = None) -> Task:
     """Phase 1/2 looping task on Qwen3.5-0.8B. Phase 5 reuses it with a larger ``model_id``."""
     s = dict(QWEN_SAMPLING, max_new_tokens=4096) if dev else dict(QWEN_SAMPLING)
     if eval_max_new_tokens:  # the dev cap of 4096 hides most looping; 32768 (the paper's) is days of eval on a v6e-1
@@ -129,7 +133,7 @@ def loop_fix(dev: bool = True, device: str = "cpu", model_id: str = QWEN, dtype:
                 "long generations, and also checked for side effects on unrelated tasks."),
         loader_kwargs={"model_id": model_id, "device": device, "dtype": dtype},
         setup_code=["from wsp.tasks.data import practice_math\npractice = practice_math(200)"],
-        gen_cap=4096, eval_suites=_math_suites(s, 100 if dev else None))
+        gen_cap=4096, eval_suites=_math_suites(s, eval_n if eval_n is not None else (100 if dev else None)))
 
 
 def gemma_math(dev: bool = True, device: str = "cpu", saes: list[dict] | None = None) -> Task:

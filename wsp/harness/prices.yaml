@@ -9,9 +9,11 @@ models:
   gemini-4-carbon:        {input_per_mtok: 2.0,  output_per_mtok: 10.0, verified: true}
   gemini-4-argon:         {input_per_mtok: 2.0,  output_per_mtok: 10.0, verified: true}
   gemini-4-hydrogen:      {input_per_mtok: 1.5,  output_per_mtok: 7.5,  verified: true}
-  # Claude via Vertex AI: not yet enabled in Model Garden for tpu-builder1. Fill in the Vertex price
-  # and model ID once enabled; until then these rows are placeholders and refused for paid runs.
-  claude-sonnet-5-5:      {input_per_mtok: 3.0,  output_per_mtok: 15.0, verified: false}
-  claude-opus-5-5:        {input_per_mtok: 15.0, output_per_mtok: 75.0, verified: false}
+  # Claude via Vertex AI. Anthropic list prices from the claude-api reference (2026-11-03 table): Opus 5.5
+  # 4 / 20, cache reads 0.20; Sonnet 5.5 2 / 10, cache reads 0.10; 5-minute cache writes are 1.25x input.
+  # Vertex bills Claude itself and its page could not be read here: confirm against the GCP billing
+  # report after the smoke cell, then set verified: true. Unverified rows only run with --allow-unverified.
+  claude-sonnet-5-5:      {input_per_mtok: 2.0,  output_per_mtok: 10.0, cache_read_per_mtok: 0.10, cache_write_per_mtok: 2.5, verified: false}
+  claude-opus-5-5:        {input_per_mtok: 4.0,  output_per_mtok: 20.0, cache_read_per_mtok: 0.20, cache_write_per_mtok: 5.0, verified: false}
   # Offline fake provider used by tests and dry runs
   fake:                   {input_per_mtok: 0.0,  output_per_mtok: 0.0, verified: true}

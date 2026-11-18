@@ -235,36 +235,60 @@ _DIR = {"description": "name of a [d_model] tensor in ws, or a list of floats",
         "anyOf": [_S, {"type": "array", "items": _N}]}
 _FREE = "FREE (weights only, no forward pass). "
 _PASS = "Costs ONE forward pass. "
+# One real example per tool (outputs trimmed, from Qwen3.5-0.8B on prompts unrelated to any task), so an
+# agent can see what a call returns before spending a pass on it. Frozen in the p2b pre-registration.
+EX = {
+    "neuron_logits": " Example: neuron_logits(layer=22, neuron=566, k=6) -> 'neuron 22.566 writes norm 0.247; "
+                     "promotes: box, ' box', Box, ' Box', -box, ' boxes'; suppresses: ...'.",
+    "direction_logits": " Example: direction_logits(direction='french', k=6) -> 'promotes: ...; suppresses: ...' "
+                        "(a residual direction is not always readable through the unembedding).",
+    "writers_of": " Example: writers_of(direction='french', layers=[10, 11, 12], k=4) -> 'neuron 12.9: cos +0.181; "
+                  "neuron 12.1104: cos +0.180; neuron 11.1550: cos -0.157; ...'.",
+    "capture": " Example: capture(prompts=['The capital of France is'], points=['resid_post.12', 'mlp_out.12'], "
+               "key='cap1') -> ws['cap1:resid_post.12'] shape (1, 5, 1024), ...; analyse it in `python`. Points "
+               "include embeddings, resid_pre.L, resid_mid.L, resid_post.L, attn_out.L, mlp_out.L, mlp_act.L, "
+               "attn_probs.L, final_norm.",
+    "logit_lens": " Example: logit_lens(prompt='The capital of France is', layers=[12, 18, 23], k=3) -> "
+                  "'L12: 门户, ____ ...; L18: ' located', 位于 ...; L23: ' Paris', ' the', ' located''.",
+    "attention": " Example: attention(prompt='Mary gave the book to John because John asked for it', layer=3, k=3) "
+                 "-> per head, the top attended tokens from the last token: 'head 0: book@3=0.62, to@4=0.15 ...'.",
+    "contrast_direction": " Example: contrast_direction(prompts_a=[two French sentences], prompts_b=[the same in "
+                          "English], layer=12, name='french') -> 'ws['french'] = mean(A) - mean(B) at "
+                          "resid_post.12, norm 0.679, separation 1.69 sd'.",
+    "steer_test": " Example: steer_test(prompts=['Tell me about the weather.'], direction='french', layer=12, "
+                  "coeff=1.5) -> the reply comes out in French; at coeff=3.0 it degrades to '1 1 1 1': coefficients "
+                  "are in units of the direction's norm, so start small.",
+}
 
 
 def c1_tools() -> dict[str, Tool]:
     t = c0_tools()
     t.update({
         "neuron_logits": Tool(_spec("neuron_logits", _FREE + "What an MLP neuron writes, read through the "
-                                    "unembedding.", {"layer": _I, "neuron": _I, "k": _I}, ["layer", "neuron"]),
+                                    "unembedding." + EX["neuron_logits"], {"layer": _I, "neuron": _I, "k": _I}, ["layer", "neuron"]),
                               neuron_logits),
         "direction_logits": Tool(_spec("direction_logits", _FREE + "Tokens a residual direction promotes and "
-                                       "suppresses.", {"direction": _DIR, "k": _I}, ["direction"]),
+                                       "suppresses." + EX["direction_logits"], {"direction": _DIR, "k": _I}, ["direction"]),
                                  direction_logits),
         "writers_of": Tool(_spec("writers_of", _FREE + "MLP neurons whose output column best aligns with a "
-                                 "direction: the candidates to edit.", {"direction": _DIR, "layers": _IL, "k": _I},
+                                 "direction: the candidates to edit." + EX["writers_of"], {"direction": _DIR, "layers": _IL, "k": _I},
                                  ["direction"]), writers_of),
-        "capture": Tool(_spec("capture", _PASS + "Capture activations at interp-engine points (e.g. "
-                              "'resid_post.12', 'mlp_out.15', 'attn_probs.3') into ws.",
+        "capture": Tool(_spec("capture", _PASS + "Capture activations at interp-engine points into ws."
+                              + EX["capture"],
                               {"prompts": _SL, "points": _SL, "key": _S}, ["prompts", "points"]), capture_tool),
         "logit_lens": Tool(_spec("logit_lens", _PASS + "Top next-token predictions decoded from the residual "
-                                 "stream at each layer.", {"prompt": _S, "layers": _IL, "position": _I, "k": _I},
+                                 "stream at each layer." + EX["logit_lens"], {"prompt": _S, "layers": _IL, "position": _I, "k": _I},
                                  ["prompt"]), logit_lens),
-        "attention": Tool(_spec("attention", _PASS + "Where each head of a layer attends from a query position.",
+        "attention": Tool(_spec("attention", _PASS + "Where each head of a layer attends from a query position." + EX["attention"],
                                 {"prompt": _S, "layer": _I, "query_position": _I, "k": _I},
                                 ["prompt", "layer"]), attention),
         "contrast_direction": Tool(_spec("contrast_direction", _PASS + "Direction = mean activation on prompts A "
-                                         "minus prompts B at a layer; stored as ws[name].",
+                                         "minus prompts B at a layer; stored as ws[name]." + EX["contrast_direction"],
                                          {"prompts_a": _SL, "prompts_b": _SL, "layer": _I, "name": _S, "point": _S},
                                          ["prompts_a", "prompts_b", "layer", "name"]), contrast_direction),
         "steer_test": Tool(_spec("steer_test", _PASS + "Generate while adding (method='additive') or ablating "
                                  "(method='ablate') a direction at a layer. Previews an edit without changing "
-                                 "weights.", {"prompts": _SL, "direction": _DIR, "layer": _I, "coeff": _N,
+                                 "weights." + EX["steer_test"], {"prompts": _SL, "direction": _DIR, "layer": _I, "coeff": _N,
                                               "method": {"type": "string", "enum": ["additive", "ablate"]},
                                               "point": _S, "max_new_tokens": _I},
                                  ["prompts", "direction", "layer"]), steer_test),

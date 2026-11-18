@@ -317,11 +317,14 @@ class StepParser:
                                target=self.target, text=task, system=row.get("system", ""),
                                tools=row.get("tools", []))]
         if k == "assistant":
-            self.tokens += int(row.get("input_tokens", 0) or 0) + int(row.get("output_tokens", 0) or 0)
+            self.tokens += sum(int(row.get(k, 0) or 0) for k in ("input_tokens", "output_tokens",
+                                                                    "cache_read_tokens", "cache_write_tokens"))
             calls = [{"name": c.get("name"), "args": c.get("args", {})} for c in row.get("tool_calls", [])]
-            if not (row.get("text") or "").strip() and not calls:
+            thinking = (row.get("thinking") or "").strip()  # Claude / Gemini reasoning summaries (newer runs)
+            if not (row.get("text") or "").strip() and not calls and not thinking:
                 return []
-            return [self._step("think", row, text=row.get("text") or "", calls=calls)]
+            return [self._step("think", row, text=row.get("text") or "", calls=calls, thinking=thinking,
+                               finish=row.get("finish") or "")]
         if k == "tool":
             out = str(row.get("output", ""))
             m = FORWARD_LEFT.findall(out)

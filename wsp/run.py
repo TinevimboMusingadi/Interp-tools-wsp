@@ -11,9 +11,12 @@ cost estimate without calling any model. A ``baseline`` cell evaluates the unedi
 from __future__ import annotations
 
 import argparse
+import hashlib
 import itertools
 import json
+import os
 import shutil
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -69,7 +72,12 @@ def estimate(cfg: dict) -> dict:
     cap = cfg["caps"]["max_usd"]
     rows, total = [], 0.0
     for c in cells(cfg):
-        per_turn = cost_usd(c.provider["model"], est["input_tokens_per_turn"], est["output_tokens_per_turn"], prices)
+        # Claude caches the history it re-reads every turn: ``cache_hit`` of the input bills at the cache-read
+        # price (Gemini's estimate stays uncached, the conservative side)
+        hit = est.get("cache_hit", 0.0) if c.provider["kind"] == "claude-vertex" else 0.0
+        inp = est["input_tokens_per_turn"]
+        per_turn = cost_usd(c.provider["model"], inp * (1 - hit), est["output_tokens_per_turn"], prices,
+                            cache_read=inp * hit)
         expected = min(cap, per_turn * est["turns"])
         rows.append((c.id, expected))
         total += expected
@@ -92,14 +100,30 @@ def run_cell(cfg: dict, cell: Cell, results: Path) -> dict:
     caps = cfg["caps"]
     budget_kw = {"ledger_path": Path(cfg["ledger"])} if cfg.get("ledger") else {}
     budget = Budget(run_id.replace("/", "__"), max_usd=caps["max_usd"], max_tokens=caps["max_tokens"], **budget_kw)
+    _archive_attempt(runs_dir / run_id)
+    extras = task.extras(lib)
+    # the seed is real: it orders the practice problems the agent sees and seeds the provider where the
+    # API takes a seed (Gemini); Claude has no seed, so its seeds are independent samples
+    extras["setup_code"] = [*extras.get("setup_code", []), SEED_PRACTICE.format(seed=cell.seed)]
+    pkw = dict(cell.provider.get("kwargs", {}))
+    if cell.provider["kind"] == "gemini":
+        pkw.setdefault("seed", cell.seed)
     t0 = time.time()
     with Sandbox(loader=cfg.get("loader", "wsp.harness.env:eager_loader"), loader_kwargs=task.loader_kwargs,
-                 toolset=cell.condition, forward_budget=cell.budget, extras=task.extras(lib)) as sb:
-        provider = make_provider(cell.provider["kind"], cell.provider["model"], **cell.provider.get("kwargs", {}))
+                 toolset=cell.condition, forward_budget=cell.budget, extras=extras) as sb:
+        provider = make_provider(cell.provider["kind"], cell.provider["model"], **pkw)
         res = run_agent(run_id=run_id, provider=provider, sandbox=sb, system=SYSTEM,
                         task_prompt=task.task_prompt(cell.condition, cell.budget), budget=budget,
                         max_turns=caps.get("max_turns", 200), runs_dir=runs_dir)
         weights = _save_weights(sb, task.loader_kwargs, runs_dir / run_id)
+    if not res.valid:
+        # the provider ended the run (empty replies), not the agent: not a result. Recorded apart and
+        # rerun next time; no eval, so no TPU hours on it.
+        bad = results / "invalid"
+        bad.mkdir(parents=True, exist_ok=True)
+        (bad / f"{cell.id}.json").write_text(json.dumps({"cell": asdict(cell), "agent": asdict(res)}, indent=2),
+                                             encoding="utf-8")
+        raise InvalidRun(f"{cell.id}: {res.stop_reason} after {res.turns} turns")
     # Evaluate in a fresh process that loads only the saved weights, so hooks, monkeypatches or config
     # changes the agent left on the live objects cannot affect the score: only weight edits count.
     base = results / (f"baseline_{cell.variant['name']}.json" if cell.variant else "baseline.json")
@@ -113,9 +137,48 @@ def run_cell(cfg: dict, cell: Cell, results: Path) -> dict:
             Path(w).unlink(missing_ok=True)
     grade = task.grade(res.answer or {}, res.submitted or "", task.hidden) if task.grade else {}
     out = {"cell": asdict(cell), "agent": asdict(res), "eval": evaluation, "grade": grade,
-           "wall_s": round(time.time() - t0, 1), "task": task.id}
+           "wall_s": round(time.time() - t0, 1), "task": task.id, "provenance": provenance(cfg)}
     (results / f"{cell.id}.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     return out
+
+
+class InvalidRun(RuntimeError):
+    pass
+
+
+SEED_PRACTICE = ("try:\n    import random as _r\n    _r.Random({seed}).shuffle(practice)\n    del _r\n"
+                 "except NameError:\n    pass")
+
+
+def _archive_attempt(run_dir: Path) -> None:
+    """A rerun starts a fresh transcript; the previous attempt moves to ``attempt_N/`` (it used to be
+    appended to, which mixed two runs in one transcript)."""
+    if not (run_dir / "transcript.jsonl").exists():
+        return
+    n = 1
+    while (run_dir / f"attempt_{n}").exists():
+        n += 1
+    dest = run_dir / f"attempt_{n}"
+    dest.mkdir()
+    for f in run_dir.iterdir():
+        if f.is_file():
+            shutil.move(str(f), dest / f.name)
+
+
+def provenance(cfg: dict) -> dict:
+    """Git commit and a hash of the config, so every result says exactly what produced it."""
+    try:
+        sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=cfg["_dir"],
+                             timeout=10).stdout.strip()
+        dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "wsp"], capture_output=True, text=True,
+                                    cwd=cfg["_dir"], timeout=10).stdout.strip())
+    except Exception:  # noqa: BLE001 - no git on the VM copy: still record the config hash
+        sha, dirty = "", None
+    if not sha:  # the VM gets a tarball, not a checkout: the launcher passes the commit it was cut from
+        sha, dirty = os.environ.get("WSP_GIT_SHA", ""), (os.environ.get("WSP_GIT_DIRTY") == "1"
+                                                         if "WSP_GIT_SHA" in os.environ else None)
+    conf = json.dumps({k: v for k, v in cfg.items() if not k.startswith("_")}, sort_keys=True, default=str)
+    return {"git": sha, "wsp_dirty": dirty, "config_sha": hashlib.sha256(conf.encode()).hexdigest()[:16]}
 
 
 def _save_weights(sb: Sandbox, loader_kwargs: dict, out_dir: Path) -> dict:
@@ -149,7 +212,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("config")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", help="substring filter on cell ids")
+    ap.add_argument("--with-baseline", action="store_true", help="run the baseline even with --only")
     ap.add_argument("--max-cells", type=int)
+    ap.add_argument("--allow-unverified", action="store_true",
+                    help="run models whose price is not yet verified (smoke tests only)")
     a = ap.parse_args(argv)
     cfg = load_config(a.config)
     results = cfg["_dir"] / "results"
@@ -161,14 +227,17 @@ def main(argv: list[str] | None = None) -> int:
           f"Expected ${est['expected_usd']}, worst case ${est['worst_case_usd']} (all cells).")
     prices = load_prices()
     unverified = sorted({c.provider["model"] for c in todo if not prices.get(c.provider["model"], {}).get("verified")})
-    if unverified:
+    if unverified and a.allow_unverified:
+        print(f"Unverified prices for {unverified}: running anyway (--allow-unverified); check spend in GCP billing.")
+        unverified = []
+    elif unverified:
         print(f"Unverified prices for {unverified}: those cells will be refused (set verified: true in prices.yaml).")
     if a.dry_run:
         for c in todo:
             print(f"  {c.id}")
         return 0
     results.mkdir(parents=True, exist_ok=True)
-    if cfg.get("baseline") and not a.only:
+    if cfg.get("baseline") and (not a.only or a.with_baseline):
         for var in cfg.get("variants") or [None]:
             name = f"baseline_{var['name']}" if var else "baseline"
             if not (results / f"{name}.json").exists():
@@ -189,7 +258,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  cell {c.id} FAILED: {type(e).__name__}: {str(e)[:300]}", flush=True)
             failed.append(c.id)
             continue
-        print(f"  {out['agent']['stop_reason']}, ${out['agent']['spent_usd']}, eval {out['eval']}, "
+        scalars = {k: v for k, v in out["eval"].items() if not isinstance(v, (list, dict))}
+        print(f"  {out['agent']['stop_reason']}, ${out['agent']['spent_usd']}, eval {scalars}, "
               f"grade {out['grade']}", flush=True)
     if failed:
         print(f"{len(failed)} cell(s) failed and will rerun next time: {failed}", flush=True)

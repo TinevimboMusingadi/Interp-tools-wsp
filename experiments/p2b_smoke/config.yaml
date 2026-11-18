@@ -1,0 +1,20 @@
+# Smoke test for the p2b harness (not a result): one short C1 cell per agent with a tiny eval, to check
+# Gemini thought summaries, the empty-reply re-prompt, the budget line, check_practice, and the cost per
+# turn against prices.yaml before the real grid.
+id: p2b_smoke
+task: loop_fix
+task_kwargs:
+  dev: true
+  device: tpu
+  eval_max_new_tokens: 1024
+  eval_n: {math500: 8, gsm8k: 8, ifeval_subset: 8}
+conditions: [c1]
+budgets: [2]
+providers:
+  - {kind: gemini, model: gemini-4-carbon, short: carbon}
+  - {kind: gemini, model: gemini-4-argon, short: argon}
+seeds: [0]
+baseline: false
+save_weights: false
+caps: {max_usd: 3, max_tokens: 200000, max_turns: 12}
+estimate: {turns: 12, input_tokens_per_turn: 15000, output_tokens_per_turn: 1500}

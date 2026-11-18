@@ -1,0 +1,21 @@
+# p2b: the pre-registered re-run of the loop-fix comparison (C1 interp tools vs C0 raw weights), on the
+# hardened harness: empty replies re-prompted, a budget the agent can see, check_practice for every
+# condition, real seeds, 2M-token cap, full MATH-500. See README.md for hypotheses and the test.
+# Gemini 4 prices double on 2026-12-01: run the Gemini cells before then, or update prices.yaml.
+id: p2b_loop_fix
+task: loop_fix
+task_kwargs:
+  dev: false
+  device: tpu
+  eval_max_new_tokens: 8192          # 32k OOMs a v6e-1; recorded as a deviation in README.md
+  eval_n: {math500: null, gsm8k: 300, ifeval_subset: null}   # null = full set
+conditions: [c0, c1]
+budgets: [10, 25]
+providers:
+  - {kind: gemini, model: gemini-4-carbon, short: carbon}
+  - {kind: gemini, model: gemini-4-argon, short: argon}
+seeds: [0, 1, 2]
+baseline: true
+caps: {max_usd: 15, max_tokens: 2000000, max_turns: 120}
+estimate: {turns: 60, input_tokens_per_turn: 30000, output_tokens_per_turn: 2500}
+prereg: {suite: math500, treat: c1, control: c0, budget: 10, min_delta: 0.05, min_agents: 2}

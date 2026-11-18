@@ -28,7 +28,9 @@ def math500(model: Any, n: int | None = None, sampling: dict | None = None, seed
     correct = [m.equivalent(m.extract_math(g.text), ex["answer"]) for g, ex in zip(gens, ds)]
     return {"math500_acc": sum(correct) / len(ds), "math500_hit_limit": sum(g.hit_limit for g in gens) / len(ds),
             "math500_mean_tokens": sum(g.n_tokens for g in gens) / len(ds), "n": len(ds),
-            "grader": "wsp.eval.math exact+numeric"}
+            "grader": "wsp.eval.math exact+numeric",
+            # per problem, in a fixed order (sampled with ``seed``), for paired bootstrap CIs across cells
+            "math500_items": [[int(c), int(g.hit_limit)] for c, g in zip(correct, gens)]}
 
 
 def gsm8k(model: Any, n: int | None = None, sampling: dict | None = None, seed: int = 0) -> dict:
@@ -40,7 +42,7 @@ def gsm8k(model: Any, n: int | None = None, sampling: dict | None = None, seed: 
     gens = generate(model, [m.MATH_PROMPT.format(problem=ex["question"]) for ex in ds], _sampling(sampling), seed=seed)
     correct = [m.equivalent(m.extract_gsm8k(g.text), m.gsm8k_gold(ex["answer"])) for g, ex in zip(gens, ds)]
     return {"gsm8k_acc": sum(correct) / len(ds), "gsm8k_hit_limit": sum(g.hit_limit for g in gens) / len(ds),
-            "n": len(ds)}
+            "n": len(ds), "gsm8k_items": [[int(c), int(g.hit_limit)] for c, g in zip(correct, gens)]}
 
 
 def ifeval_subset(model: Any, n: int | None = None, sampling: dict | None = None, seed: int = 0) -> dict:
@@ -51,7 +53,8 @@ def ifeval_subset(model: Any, n: int | None = None, sampling: dict | None = None
         ds = random.Random(seed).sample(ds, min(n, len(ds)))
     gens = generate(model, [ex["prompt"] for ex in ds], _sampling(sampling), seed=seed)
     ok = [instruct.follows(g.text, ex) for g, ex in zip(gens, ds)]
-    return {"ifeval_subset_acc": sum(ok) / len(ds), "n": len(ds), "note": "IFEval-subset, not official"}
+    return {"ifeval_subset_acc": sum(ok) / len(ds), "n": len(ds), "note": "IFEval-subset, not official",
+            "ifeval_subset_items": [[int(o), int(g.hit_limit)] for o, g in zip(ok, gens)]}
 
 
 def sycophancy(model: Any, n_items: int = 100, split: str = "test", seed: int = 0) -> dict:

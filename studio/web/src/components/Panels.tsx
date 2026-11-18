@@ -86,7 +86,8 @@ export function AgentChat({ steps, cur, onSeek }: { steps: Step[]; cur: number; 
         return (
           <div key={s.i} className={`bubble agent ${s.i === last ? "current" : ""}`} onClick={() => onSeek(s.i)}>
             <div className="who">Agent · turn {s.turn}</div>
-            {s.text?.trim() ? <div className="txt">{s.text}</div> : intent(s) ? (
+            {s.thinking ? <div className="txt thinking" title="the agent's reasoning (summary from the API)">{s.thinking}</div> : null}
+            {s.text?.trim() ? <div className="txt">{s.text}</div> : s.thinking ? null : intent(s) ? (
               <div className="txt intent" title="from the comments in the agent's code">{intent(s)}</div>
             ) : <div className="txt dim">(no visible reasoning)</div>}
             <div className="calls">

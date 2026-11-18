@@ -58,6 +58,40 @@ def _generate(env: Env, prompts: list[str], max_new_tokens: int = 256, temperatu
     return f"(forward passes left: {left})\n{body}"
 
 
+@torch.no_grad()
+def _check_practice(env: Env, n: int = 16, max_new_tokens: int | None = None) -> str:
+    """Score the current weights on ``n`` practice problems the agent has not picked itself: a quick
+    generalisation check before submitting. A new random sample each call (seeded by the call count, so
+    runs are reproducible); graded like the held-out evals."""
+    import math as _math
+    import random
+
+    from wsp.eval import math as m
+    from wsp.eval.generate import Sampling, generate
+
+    practice = env.namespace.get("practice")
+    if not practice or not isinstance(practice, list) or "answer" not in practice[0]:
+        return "check_practice is not available in this task"
+    n = max(1, min(int(n), 128))
+    calls = env.namespace["__check_calls__"] = env.namespace.get("__check_calls__", 0) + 1
+    items = random.Random(1000 + calls).sample(practice, min(n, len(practice)))
+    cap = min(max_new_tokens or env.namespace.get("gen_cap", MAX_NEW_TOKENS), env.namespace.get("gen_cap", 4096))
+    passes = _math.ceil(len(items) / MAX_BATCH)
+    with env.forward_window(passes):
+        gens = generate(env.model, [m.MATH_PROMPT.format(problem=x["problem"]) for x in items],
+                        Sampling(max_new_tokens=cap))
+    ok = []
+    for g, x in zip(gens, items):
+        pred = m.extract_gsm8k(g.text) if x.get("source") == "gsm8k" else m.extract_math(g.text)
+        ok.append(bool(m.equivalent(pred, str(x["answer"]))))
+    left = env.forward_budget - env.forward_used
+    rows = " ".join(f"{'✓' if o else '✗'}{'L' if g.hit_limit else ''}" for o, g in zip(ok, gens))
+    return (f"(forward passes left: {left})\ncheck_practice on {len(items)} problems (sample #{calls}, "
+            f"greedy, {cap} new tokens): accuracy {sum(ok) / len(items):.0%}, hit the token limit "
+            f"{sum(g.hit_limit for g in gens) / len(items):.0%}, mean length "
+            f"{sum(g.n_tokens for g in gens) / len(items):.0f} tokens\nper problem (✓ right, ✗ wrong, L hit limit): {rows}")
+
+
 def _edit_report(env: Env) -> str:
     return env.edit_report()
 
@@ -91,6 +125,16 @@ def c0_tools() -> dict[str, Tool]:
                          "description": "wrap each prompt in the model's chat template"},
             }, "required": ["prompts"]},
         ), _generate),
+        "check_practice": Tool(ToolSpec(
+            "check_practice",
+            f"Score the current (edited) weights on a fresh random sample of `n` practice problems (default 16) "
+            f"and report accuracy, how many hit the token limit, and mean length. Costs ceil(n/{MAX_BATCH}) "
+            "forward passes. Use it to check that an edit generalises beyond the problems you inspected.",
+            {"type": "object", "properties": {
+                "n": {"type": "integer", "default": 16},
+                "max_new_tokens": {"type": "integer", "description": "defaults to the task's generation cap"},
+            }},
+        ), _check_practice),
         "edit_report": Tool(ToolSpec(
             "edit_report", "Report how many weights have changed so far, by tensor.",
             {"type": "object", "properties": {}},

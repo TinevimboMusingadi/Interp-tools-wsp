@@ -13,6 +13,7 @@ dependencies = [
     "transformers>=5.0",
     "numpy>=1.24",
     "pyyaml>=6",
+    "datasets>=2.19",            # MATH-500, GSM8K, IFEval and practice sets
 ]
 
 [project.optional-dependencies]
